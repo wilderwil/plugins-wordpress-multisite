@@ -1,0 +1,63 @@
+# WordPress Core
+/wordpress/
+/wp-admin/
+/wp-includes/
+/wp-content/index.php
+/wp-content/languages/
+/wp-content/upgrade/
+
+# Plugins de terceros (no custom)
+/wp-content/plugins/akismet/
+/wp-content/plugins/hello.php
+
+# Uploads y cache
+/wp-content/uploads/
+/wp-content/cache/
+/wp-content/backup*/
+/wp-content/backups/
+/wp-content/blogs.dir/
+/wp-content/upgrade/
+
+# Temas de terceros (si no son custom)
+# /wp-content/themes/twentytwenty*/
+
+# Configuración y seguridad
+wp-config.php
+.htaccess
+.user.ini
+
+# Configuración local de deployment (IMPORTANTE)
+deploy-config.local.sh
+
+# Logs y temporal
+*.log
+error_log
+debug.log
+*.sql
+*.sql.gz
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node modules si usas build tools
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# IDEs
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.project
+.settings/
+
+# Composer (si usas)
+/vendor/
+composer.lock
+
+# Otros
+*.swp
+*.swo
+*~
+.sass-cache/
