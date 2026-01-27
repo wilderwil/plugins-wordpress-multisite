@@ -452,43 +452,167 @@ Lee [CONTRIBUTING.md](CONTRIBUTING.md) para saber cómo contribuir al proyecto.
 
 ## 🎯 Ejemplo Completo: Ciclo de Desarrollo
 
+### Caso Real: Crear un nuevo plugin
+
 ```bash
-# 1. PREPARAR
+# ====================================
+# 1. PREPARAR AMBIENTE DE DESARROLLO
+# ====================================
 git checkout develop
 git pull origin develop
-git checkout -b feature/nueva-funcionalidad
+git checkout -b feature/hello-plugin
 
-# 2. DESARROLLAR
+# ====================================
+# 2. DESARROLLAR Y CREAR ARCHIVOS
+# ====================================
+# Crear tu plugin en: wp-content/plugins/hello-ztgroup/
+# - hello-ztgroup.php (archivo principal)
+# - README.md (documentación)
 # ... editar archivos ...
-git add .
-git commit -m "feat: Agregar nueva funcionalidad"
-git push origin feature/nueva-funcionalidad
 
-# 3. INTEGRAR
+# Ver cambios
+git status
+git diff
+
+# ====================================
+# 3. COMMIT Y PUSH A GITHUB
+# ====================================
+git add wp-content/plugins/hello-ztgroup/
+git commit -m "$(cat <<'EOF'
+feat: Agregar plugin Hello ZTGroup de ejemplo
+
+- Crear plugin básico de WordPress
+- Incluye mensaje en dashboard y página de admin
+- Hooks de activación/desactivación
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+EOF
+)"
+
+# Subir feature branch a GitHub (opcional, para backup)
+git push origin feature/hello-plugin
+
+# ====================================
+# 4. INTEGRAR A DEVELOP
+# ====================================
 git checkout develop
-git merge feature/nueva-funcionalidad
+git merge feature/hello-plugin
 git push origin develop
 
-# 4. STAGING
+# ====================================
+# 5. PASAR A STAGING (PRUEBAS)
+# ====================================
 git checkout staging
 git pull origin staging
 git merge develop
 git push origin staging
-./deploy-staging.sh
-# Probar en staging...
 
-# 5. PRODUCCIÓN
+# Actualizar deploy-config.local.sh con el nuevo plugin
+# CUSTOM_PLUGINS="hello-ztgroup"
+
+# Deploy a servidor staging
+./deploy-staging.sh
+
+# ⚠️ IMPORTANTE: Probar en staging
+# Verificar en: https://staging.tudominio.com/wp-admin
+# - Activar el plugin
+# - Probar todas las funcionalidades
+# - Verificar que no hay errores
+
+# ====================================
+# 6. PASAR A PRODUCCIÓN
+# ====================================
 git checkout master
 git pull origin master
 git merge staging
 git push origin master
-git tag -a v1.1.0 -m "Versión 1.1.0"
-git push origin v1.1.0
+
+# Crear tag de versión
+git tag -a v1.0.0 -m "Versión 1.0.0 - Plugin Hello ZTGroup inicial"
+git push origin v1.0.0
+
+# Deploy a producción (requiere confirmación)
 ./deploy-production.sh
 
-# 6. CONTINUAR
+# ⚠️ IMPORTANTE: Verificar en producción
+# https://tudominio.com/wp-admin
+
+# ====================================
+# 7. LIMPIEZA Y CONTINUAR
+# ====================================
+# Eliminar feature branch (ya no es necesaria)
+git branch -d feature/hello-plugin
+git push origin --delete feature/hello-plugin
+
+# Volver a develop para próxima funcionalidad
 git checkout develop
+
+# Ver estado final
+git log --oneline --graph --all -10
+git tag -l
 ```
+
+### Resumen Visual del Flujo
+
+```
+develop (actualizado)
+   ↓
+feature/hello-plugin (crear branch)
+   ↓
+[Desarrollar código]
+   ↓
+commit + push a GitHub
+   ↓
+merge → develop → push
+   ↓
+merge → staging → push
+   ↓
+./deploy-staging.sh (probar)
+   ↓
+merge → master → push
+   ↓
+tag v1.0.0 → push
+   ↓
+./deploy-production.sh (deploy)
+   ↓
+Eliminar feature branch
+   ↓
+Volver a develop (listo para próxima feature)
+```
+
+### Tips Importantes
+
+1. **Siempre sincroniza antes de empezar:**
+   ```bash
+   git checkout develop
+   git pull origin develop
+   ```
+
+2. **Usa mensajes de commit descriptivos:**
+   - ✅ `feat: Agregar validación de email en formulario`
+   - ❌ `cambios` o `update`
+
+3. **Prueba en staging antes de producción:**
+   - No saltes el paso de staging
+   - Verifica que todo funcione correctamente
+
+4. **Usa tags para versiones importantes:**
+   ```bash
+   git tag -a v1.0.0 -m "Descripción de la versión"
+   git push origin v1.0.0
+   ```
+
+5. **Limpia branches cuando termines:**
+   ```bash
+   git branch -d feature/nombre
+   git push origin --delete feature/nombre
+   ```
+
+6. **Verifica el estado frecuentemente:**
+   ```bash
+   git status
+   git log --oneline --graph --all -5
+   ```
 
 ## 📄 Licencia
 
