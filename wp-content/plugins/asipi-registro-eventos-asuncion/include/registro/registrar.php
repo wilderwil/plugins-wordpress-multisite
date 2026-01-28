@@ -451,15 +451,17 @@ if ($is_valid_coupon) {
   );
 }
 
-if($_REQUEST["user_type"]=='socio'){
-  //are_notificacion($_REQUEST['email'],$_REQUEST['nombre'][0].' '.$_REQUEST['nombre'][1], $lang);
+// SEGURIDAD: Validar user_type con variable ya sanitizada
+if($user_type == 'socio'){
+  //are_notificacion($email, esc_html($_REQUEST['nombre'][0]).' '.esc_html($_REQUEST['nombre'][1]), $lang);
 }
 
-if($_REQUEST["tesoreria"]){
-  //are_notificacion('soporte@asipi.org',$_REQUEST['nombre'][0].' '.$_REQUEST['nombre'][1], $lang);
+// SEGURIDAD: Usar variable ya sanitizada para tesorería
+if($es_tesoreria){
+  //are_notificacion('soporte@asipi.org', esc_html($_REQUEST['nombre'][0]).' '.esc_html($_REQUEST['nombre'][1]), $lang);
   echo '<div style="padding: 20px">';
-  echo '<br><br><p>Usuario ('.$_REQUEST['nombre'][0].' '.$_REQUEST['nombre'][1].') registrado en el evento</p>';
-  echo '<p><a href="https://asipi.org/wp-admin/admin.php?page=teso-settings&tab=5">Volver a Tesorería.</a></p><br><br>';
+  echo '<br><br><p>Usuario ('.esc_html(isset($_REQUEST['nombre'][0]) ? $_REQUEST['nombre'][0] : '').' '.esc_html(isset($_REQUEST['nombre'][1]) ? $_REQUEST['nombre'][1] : '').') registrado en el evento</p>';
+  echo '<p><a href="' . esc_url('https://asipi.org/wp-admin/admin.php?page=teso-settings&tab=5') . '">Volver a Tesorería.</a></p><br><br>';
   echo '</div>';
   exit();
 }
@@ -475,135 +477,183 @@ function are_newUser()
 {
     global $wpdb;
     global $blog_id;
-		//$userType = verify_email(false);
-		if ( $_REQUEST['id_usuario'] == "0" ) {
-      $password = rand();// $_REQUEST['password'];
-      //rand();  //$_REQUEST['password'];
-      //$_REQUEST['password'] = $password;
-			$email = $_REQUEST["email"];
 
-			// Transform email into username
-			$array=explode("@",$email);
-			$arrayStr=explode(".",$array[0]);
-			$username=implode("", $arrayStr);
-			$arrayStr=explode("-",$username);
-			$username=implode("", $arrayStr);
+    // SEGURIDAD: Sanitizar y validar id_usuario
+    $id_usuario = isset($_REQUEST['id_usuario']) ? absint($_REQUEST['id_usuario']) : 0;
 
-			if( null != username_exists( $username ) ) {
-				// username is already registered!
-				do{
-					$username = $username. rand(1,100);
-				}while(username_exists($username));
-			}
+    if ( $id_usuario == 0 ) {
+      $password = wp_generate_password(12, true, true); // Generar password seguro
 
-			$userdata = array(
-			    'user_login'  =>  esc_sql( $username ),
-			    'user_email'  =>  esc_sql( $email ),
-			    'user_pass'   =>  $password,
-			    'role'   =>  'subscriber'
+      // SEGURIDAD: Email ya fue sanitizado en la función principal
+      $email = isset($_REQUEST["email"]) ? sanitize_email($_REQUEST["email"]) : '';
+      if (!is_email($email)) {
+          return 0;
+      }
+
+      // Transform email into username
+      $array = explode("@", $email);
+      $arrayStr = explode(".", $array[0]);
+      $username = implode("", $arrayStr);
+      $arrayStr = explode("-", $username);
+      $username = implode("", $arrayStr);
+      $username = sanitize_user($username); // SEGURIDAD: Sanitizar username
+
+      if( null != username_exists( $username ) ) {
+        // username is already registered!
+        do{
+          $username = $username . rand(1,100);
+          $username = sanitize_user($username); // SEGURIDAD: Sanitizar username generado
+        }while(username_exists($username));
+      }
+
+      // SEGURIDAD: No usar esc_sql aquí, wp_insert_user lo hace internamente
+      $userdata = array(
+          'user_login'  =>  $username,
+          'user_email'  =>  $email,
+          'user_pass'   =>  $password,
+          'role'   =>  'subscriber'
       );
-      //var_dump($userdata);
-      //return 0;
-      
-			// se agrega al nuevo usuario 
-      $user_id = wp_insert_user( $userdata ) ;
-      //var_dump($user_id) ;
-      //return $user_id;
-      
-			if ($user_id>0) {
-				// se agrega como participante a eventos de asipi
-				$sql = "INSERT INTO asipi_events_attendees ( user_id, event_id ) VALUES ( '".$user_id."' , '".$blog_id."' )";
-				$queryResult = $wpdb->get_results($sql);
 
-				// se agrega la propiedad de lenguaje al usuario nuevo
-				$field_lang = '14';
-				$idioma = ( $_POST['lang']=='en-US' || $_POST['lang']=='en' ) ? 'Inglés' : 'Español' ;
+      // se agrega al nuevo usuario
+      $user_id = wp_insert_user( $userdata );
 
-				$sql = "INSERT INTO pwisa_bp_xprofile_data ( user_id, field_id, value ) VALUES ( ".$user_id.", ".$field_lang.", '".$idioma."' )";
-				$queryResult = $wpdb->get_results($sql);
+      if ( is_wp_error( $user_id ) ) {
+          return 0;
+      }
 
-				// se agrega al nuevo usuario como suscriptor en el sitio del evento
-				//if ( !is_user_member_of_blog( $user_id, $blog_id ) ) {
-					add_user_to_blog( $blog_id, $user_id, 'subscriber' );	
-				//}
-				// se quita al usuario como suscriptor del sitio principal de asipi
-				//$e = remove_user_from_blog($user_id, 1); // el 1 es el id del sitio principal (multisite)
+      if ($user_id > 0) {
+        // SEGURIDAD: Usar prepared statement para INSERT
+        $wpdb->insert(
+          'asipi_events_attendees',
+          array(
+            'user_id' => absint($user_id),
+            'event_id' => absint($blog_id)
+          ),
+          array('%d', '%d')
+        );
+
+        // SEGURIDAD: Sanitizar y validar lenguaje con whitelist
+        $lang_input = isset($_POST['lang']) ? sanitize_text_field($_POST['lang']) : 'es';
+        $allowed_langs = array('en-US', 'en', 'es');
+        $lang_input = in_array($lang_input, $allowed_langs) ? $lang_input : 'es';
+        $idioma = ($lang_input == 'en-US' || $lang_input == 'en') ? 'Inglés' : 'Español';
+
+        // SEGURIDAD: Usar prepared statement para INSERT
+        $field_lang = 14;
+        $wpdb->insert(
+          'pwisa_bp_xprofile_data',
+          array(
+            'user_id' => absint($user_id),
+            'field_id' => absint($field_lang),
+            'value' => sanitize_text_field($idioma)
+          ),
+          array('%d', '%d', '%s')
+        );
+
+        // se agrega al nuevo usuario como suscriptor en el sitio del evento
+        add_user_to_blog( absint($blog_id), absint($user_id), 'subscriber' );
 
         // loguear al nuevo usuario.
-        //$idlogin = are_login();
-        return $user_id;//are_login();
-			} else {
-				return '0';
+        return $user_id;
+      } else {
+        return 0;
       }
-      
-			
-		}else {
-			return '0';
-		}
+
+
+    }else {
+      return 0;
+    }
 }
+
 function are_login()
 {
     global $wpdb;
-		if (!isset($_REQUEST['password']) or $_REQUEST['password']=='') {
-			return 'Error: no existe';
-		} 
-		$password = $_REQUEST['password'];
-		$email = $_REQUEST["email"];
-			$query = 'SELECT id, user_login FROM pwisa_users WHERE user_email="'.$email.'" limit 1;';
-			$result = get_object_vars( $wpdb->get_row( $query ) );
-			//var_dump($result);
-			//$user_id = $result['id'];
-			$user_login = $result['user_login'];
 
-			$creds = array();
-			$creds['user_login'] = $user_login;
-			$creds['user_password'] = $password;
-      $creds['remember'] = false;
-      //var_dump($creds);
-      //return 0;
-      $user = wp_authenticate( $creds['user_login'], $creds['user_password'] ); 
-			//$user = wp_signon( $creds, false );				
+    // SEGURIDAD: Sanitizar y validar password
+    if (!isset($_REQUEST['password']) || empty($_REQUEST['password'])) {
+        return 'Error: no existe';
+    }
+    // No sanitizar password, se usa tal cual para autenticación
+    $password = $_REQUEST['password'];
 
-			if ( is_wp_error($user) ){
-					return false;
-      } else {
-          wp_set_current_user($user->ID);
-          //$secure_cookie = apply_filters( 'secure_signon_cookie', $secure_cookie, $creds );
-          //global $auth_secure_cookie;
-          //$auth_secure_cookie = $secure_cookie;
-          wp_set_auth_cookie( $user->ID );
+    // SEGURIDAD: Email ya fue sanitizado en la función principal
+    $email = isset($_REQUEST["email"]) ? sanitize_email($_REQUEST["email"]) : '';
+    if (!is_email($email)) {
+        return false;
+    }
 
-          //$user = wp_signon( $creds, false );
-          $_REQUEST['id_usuario']=$user->ID;
-          return $user->ID;
-      }
+    // SEGURIDAD: Usar prepared statement
+    $result = $wpdb->get_row( $wpdb->prepare(
+        "SELECT id, user_login FROM pwisa_users WHERE user_email = %s LIMIT 1",
+        $email
+    ), ARRAY_A );
+
+    if (!$result || !isset($result['user_login'])) {
+        return false;
+    }
+
+    $user_login = $result['user_login'];
+
+    $creds = array();
+    $creds['user_login'] = sanitize_user($user_login);
+    $creds['user_password'] = $password;
+    $creds['remember'] = false;
+
+    // Usar wp_authenticate para validar credenciales
+    $user = wp_authenticate( $creds['user_login'], $creds['user_password'] );
+
+    if ( is_wp_error($user) ){
+        return false;
+    } else {
+        wp_set_current_user( absint($user->ID) );
+        wp_set_auth_cookie( absint($user->ID) );
+
+        return absint($user->ID);
+    }
 }
-function are_newOrden($tipoUsuario, $today) 
-{ // user_type, email
+function are_newOrden($tipoUsuario, $today)
+{
     global $wpdb;
     global $blog_id;
-    //$user_id = ($_REQUEST['id_usuario']>0) ? $_REQUEST['id_usuario'] : get_current_user_id() ;
-    $user_id = ($_REQUEST['id_usuario']) ? $_REQUEST['id_usuario'] : 9999 ;
 
-		$orden_id = $wpdb->get_var("SELECT id FROM evento_orden WHERE visible=1 AND evento_id='".$blog_id."' AND pwisa_users_id='".$user_id."'");
-	
-		if(!$orden_id){
-			## asigna el numero de factura a la orden del evento
-				$sqlMaior = "SELECT MAX(numero) FROM evento_orden WHERE visible=1 AND evento_id='".$blog_id."'";
-				$actual = $wpdb->get_var($sqlMaior);
-				$actual = ($actual == null) ? 0 : $actual;
-				$numeroVigente = $actual+1;
+    // SEGURIDAD: Sanitizar user_id
+    $user_id = isset($_REQUEST['id_usuario']) ? absint($_REQUEST['id_usuario']) : 0;
+    if ($user_id == 0) {
+        $user_id = get_current_user_id();
+        $user_id = absint($user_id);
+    }
+    if ($user_id == 0) {
+        return false; // No hay usuario válido
+    }
+
+    // SEGURIDAD: Usar prepared statement
+    $orden_id = $wpdb->get_var( $wpdb->prepare(
+        "SELECT id FROM evento_orden WHERE visible = 1 AND evento_id = %d AND pwisa_users_id = %d",
+        absint($blog_id),
+        $user_id
+    ));
+
+    if(!$orden_id){
+      ## asigna el numero de factura a la orden del evento
+      // SEGURIDAD: Usar prepared statement
+      $actual = $wpdb->get_var( $wpdb->prepare(
+          "SELECT MAX(numero) FROM evento_orden WHERE visible = 1 AND evento_id = %d",
+          absint($blog_id)
+      ));
+      $actual = ($actual == null) ? 0 : absint($actual);
+      $numeroVigente = $actual + 1;
       ## fin numero factura
 
       ## estatus de pago
+      $status = 'P'; // Por defecto: Pendiente
       if( isset($_REQUEST['misproductos']['transactionID']) ){
-        $status = 'C';
-      }else{
-        $status = 'P';
+        $status = 'C'; // Completado con PayPal
       }
 
-      if( $_REQUEST['total']==0 ){
-        $status = 'C';
+      // SEGURIDAD: Sanitizar total
+      $total = isset($_REQUEST['total']) ? absint($_REQUEST['total']) : 0;
+      if( $total == 0 ){
+        $status = 'C'; // Completado sin pago
       }
           // si hay referencia de paypal status Completado
           // viene por tesoreria o por transferencia bancaria status Pendiente
@@ -616,121 +666,157 @@ function are_newOrden($tipoUsuario, $today)
         $status = 'C';
       } */
 
-      
+      // SEGURIDAD: Sanitizar IDs de actividades (igual que en la función principal)
+      $evento_social_1_id = (isset($_REQUEST['monto_actividad_1211']) && absint($_REQUEST['monto_actividad_1211']) > 0)
+          ? absint($_REQUEST['id_actividad_1']) : 0; // Carrera Caminata 54
 
-      $evento_social_1_id = ($_REQUEST['monto_actividad_1211']>0) ? $_REQUEST['id_actividad_1'] : '0' ; // Carrera Caminata 54
-      $evento_social_2_id = ($_REQUEST['monto_actividad_2210']>0) ? $_REQUEST['id_actividad_2'] : '0' ; // Ruta indicaciones Geograficas 56
-      $evento_social_3_id = ($_REQUEST['monto_actividad_3']>0) ? $_REQUEST['id_actividad_3'] : '0' ; // city Tour 74
-      $evento_social_4_id = ($_REQUEST['id_actividad_4']!='') ? $_REQUEST['id_actividad_4'] : '0' ; // Come as You are 55
-      $evento_social_5_id = ($_REQUEST['id_actividad_5']!='') ? $_REQUEST['id_actividad_5'] : '0' ; // yoga 53
-      $evento_actividad_id = ($_REQUEST['id_actividad_6']!='') ? $_REQUEST['id_actividad_6'] : '0' ; //Deportiva Verificar el concepto de la actividad
-      $evento_taller_id = ($_REQUEST['id_taller_1']!='') ? $_REQUEST['id_taller_1'] : '0' ;
-      $evento_taller2_id = ($_REQUEST['id_taller_2']!='') ? $_REQUEST['id_taller_2'] : '0' ;
-      $evento_social_7_id = ($_REQUEST['id_actividad_7']!='') ? $_REQUEST['id_actividad_7'] : '0' ; // ¡Buen provecho! Hoy almorzamos una Especialidad Tradicional Garantizada 61
-      $evento_social_8_id = ($_REQUEST['id_actividad_8']!='') ? $_REQUEST['id_actividad_8'] : '0' ; // Desayuno Concurso Innovación Verde 75
-      $evento_social_9_id = ($_REQUEST['id_actividad_9']!='') ? $_REQUEST['id_actividad_9'] : '0' ; // Cata de vino y maridaje
-   
-			// Crear orden del evento
-			$sqlActivites = "INSERT INTO evento_orden 
-                (pwisa_users_ID, 
-                evento_id, 
-                estado, 
-                numero, 
-                visible, 
-                paso, 
-                fecha, 
-                fecha_vencimiento, 
-                tipo,
-                evento_actividad_id,
-                evento_taller_id,
-                evento_taller_2_id,
-                evento_social_1_id,
-                evento_social_2_id,
-                evento_social_3_id
-                ) 
-							VALUES (
-								'".$user_id."', 
-								'".$blog_id."', 
-								'".$status."', 
-								'".$numeroVigente."',
-								'1', 
-								'4', 
-								'".$today."', 
-								'".date('Y-m-d', strtotime("+5 days") )."',
-								'".$tipoUsuario."',
-								'0',
-                '".$evento_taller_id."',
-                '".$evento_taller2_id."',
-				'".$evento_social_1_id."',
-                '".$evento_social_2_id."',
-                '".$evento_social_3_id."'
-							);";
-              //echo $sqlActivites;
-			$insertOrden = $wpdb->get_results($sqlActivites);
-      $orden_id = $wpdb->get_var("SELECT id FROM evento_orden WHERE visible=1 AND evento_id='".$blog_id."' AND pwisa_users_id='".$user_id."'");
+      $evento_social_2_id = (isset($_REQUEST['monto_actividad_2210']) && absint($_REQUEST['monto_actividad_2210']) > 0)
+          ? absint($_REQUEST['id_actividad_2']) : 0; // Ruta indicaciones Geográficas 56
+
+      $evento_social_3_id = (isset($_REQUEST['monto_actividad_3']) && absint($_REQUEST['monto_actividad_3']) > 0)
+          ? absint($_REQUEST['id_actividad_3']) : 0; // City Tour 74
+
+      $evento_social_4_id = (isset($_REQUEST['id_actividad_4']) && $_REQUEST['id_actividad_4'] != '')
+          ? absint($_REQUEST['id_actividad_4']) : 0; // Come as You are 55
+
+      $evento_social_5_id = (isset($_REQUEST['id_actividad_5']) && $_REQUEST['id_actividad_5'] != '')
+          ? absint($_REQUEST['id_actividad_5']) : 0; // Yoga 53
+
+      $evento_actividad_id = (isset($_REQUEST['id_actividad_6']) && $_REQUEST['id_actividad_6'] != '')
+          ? absint($_REQUEST['id_actividad_6']) : 0; //Deportiva
+
+      $evento_taller_id = (isset($_REQUEST['id_taller_1']) && $_REQUEST['id_taller_1'] != '')
+          ? absint($_REQUEST['id_taller_1']) : 0;
+
+      $evento_taller2_id = (isset($_REQUEST['id_taller_2']) && $_REQUEST['id_taller_2'] != '')
+          ? absint($_REQUEST['id_taller_2']) : 0;
+
+      $evento_social_7_id = (isset($_REQUEST['id_actividad_7']) && $_REQUEST['id_actividad_7'] != '')
+          ? absint($_REQUEST['id_actividad_7']) : 0; // Especialidad Tradicional 61
+
+      $evento_social_8_id = (isset($_REQUEST['id_actividad_8']) && $_REQUEST['id_actividad_8'] != '')
+          ? absint($_REQUEST['id_actividad_8']) : 0; // Desayuno Concurso 75
+
+      $evento_social_9_id = (isset($_REQUEST['id_actividad_9']) && $_REQUEST['id_actividad_9'] != '')
+          ? absint($_REQUEST['id_actividad_9']) : 0; // Cata de vino
+
+      // SEGURIDAD: Usar $wpdb->insert() en lugar de concatenación
+      $insertOrden = $wpdb->insert(
+          'evento_orden',
+          array(
+              'pwisa_users_ID' => $user_id,
+              'evento_id' => absint($blog_id),
+              'estado' => sanitize_text_field($status),
+              'numero' => absint($numeroVigente),
+              'visible' => 1,
+              'paso' => 4,
+              'fecha' => $today,
+              'fecha_vencimiento' => date('Y-m-d', strtotime("+5 days")),
+              'tipo' => absint($tipoUsuario),
+              'evento_actividad_id' => 0,
+              'evento_taller_id' => $evento_taller_id,
+              'evento_taller_2_id' => $evento_taller2_id,
+              'evento_social_1_id' => $evento_social_1_id,
+              'evento_social_2_id' => $evento_social_2_id,
+              'evento_social_3_id' => $evento_social_3_id
+          ),
+          array(
+              '%d', // pwisa_users_ID
+              '%d', // evento_id
+              '%s', // estado
+              '%d', // numero
+              '%d', // visible
+              '%d', // paso
+              '%s', // fecha
+              '%s', // fecha_vencimiento
+              '%d', // tipo
+              '%d', // evento_actividad_id
+              '%d', // evento_taller_id
+              '%d', // evento_taller_2_id
+              '%d', // evento_social_1_id
+              '%d', // evento_social_2_id
+              '%d'  // evento_social_3_id
+          )
+      );
+
+      // SEGURIDAD: Obtener orden_id con prepared statement
+      $orden_id = $wpdb->get_var( $wpdb->prepare(
+          "SELECT id FROM evento_orden WHERE visible = 1 AND evento_id = %d AND pwisa_users_id = %d",
+          absint($blog_id),
+          $user_id
+      ));
 
       //if($insertOrden){
       if(!$orden_id){
       }else{
         $orden_id = $wpdb->insert_id;
 
-        $tipo_asistencia = $_REQUEST['tipo_asistencia'];
-        //$talla = $_REQUEST['tallacamisa'];
-        //$talla_companion = $_REQUEST['talla_companion'];
-        $tipo_habitacion = (isset($_REQUEST['ruta_tipo_hab'])) ? $_REQUEST['ruta_tipo_hab'] : '' ;
-        //$fechahab = (isset($_REQUEST['estadia'])) ? $_REQUEST['estadia'] : '' ;
-        $tipo_carrera = (isset($_REQUEST['actividad1_tipo_carrera'])) ? $_REQUEST['actividad1_tipo_carrera'] : '' ;
-        $tipo_carrera_companion = (isset($_REQUEST['actividad1_tipo_carrera_companion'])) ? $_REQUEST['actividad1_tipo_carrera_companion'] : '' ;
-        $companion_actividad_1 = (is_array($_REQUEST['escribauna191'])) ? 'SI' : '' ;
-        $companion_actividad_2 = (isset($_REQUEST['companion_name1']) and $_REQUEST['companion_name1']!="") ? 'SI' : '' ;
-        $companion_actividad_9 = (is_array($_REQUEST['acompanante_actividad_9'])) ? 'SI' : '';
-        $companion_actividad_4 = (is_array($_REQUEST['acompanante_actividad_4'])) ? 'SI' : '' ;
-        $companion_actividad_5 = (is_array($_REQUEST['acompanante_actividad_5'])) ? 'SI' : '' ;
-   if(isset($_REQUEST['acompanantegolf']) &&  $_REQUEST['acompanantegolf']!=""){
-    $companion_actividad_6 =  '60';
-  }
-  if(isset($_REQUEST['acompanantepadel']) &&  $_REQUEST['acompanantepadel']!=""){
-    $companion_actividad_6 =  '57';
-  }
-    if(isset($_REQUEST['acompanantefutbol']) &&  $_REQUEST['acompanantefutbol']!=""){
-    $companion_actividad_6 =  '59';
-  }
-      if(isset($_REQUEST['acompanantetenis']) &&  $_REQUEST['acompanantetenis']!=""){
-    $companion_actividad_6 =  '58';
-  }
-  
-        $companion_citytour = (is_array($_REQUEST['acompanante_citytour'])) ? 'SI' : '' ;
-        $taller_turno_1 = (isset($_REQUEST['id_taller_1'])) ? $_REQUEST['id_taller_1'] : '' ;
-        $taller_turno_2 = (isset($_REQUEST['id_taller_2'])) ? $_REQUEST['id_taller_2'] : '' ;
-        $mentor =  (isset($_REQUEST['mentor'])) ? $_REQUEST['mentor'] : ''; 
-        //$tipo_companion_ruta="";
+        // SEGURIDAD: Sanitizar todas las entradas de usuario (igual que en la función principal)
+        $tipo_asistencia = isset($_REQUEST['tipo_asistencia']) ? sanitize_text_field($_REQUEST['tipo_asistencia']) : '';
+        $tipo_habitacion = isset($_REQUEST['ruta_tipo_hab']) ? sanitize_text_field($_REQUEST['ruta_tipo_hab']) : '';
+
+        $tipo_carrera = isset($_REQUEST['actividad1_tipo_carrera'])
+            ? sanitize_text_field($_REQUEST['actividad1_tipo_carrera']) : '';
+        $tipo_carrera_companion = isset($_REQUEST['actividad1_tipo_carrera_companion'])
+            ? sanitize_text_field($_REQUEST['actividad1_tipo_carrera_companion']) : '';
+
+        // Validar arrays correctamente
+        $companion_actividad_1 = (isset($_REQUEST['escribauna191']) && is_array($_REQUEST['escribauna191'])) ? 'SI' : '';
+        $companion_actividad_2 = (isset($_REQUEST['companion_name1']) && sanitize_text_field($_REQUEST['companion_name1']) != '') ? 'SI' : '';
+        $companion_actividad_9 = (isset($_REQUEST['acompanante_actividad_9']) && is_array($_REQUEST['acompanante_actividad_9'])) ? 'SI' : '';
+        $companion_actividad_4 = (isset($_REQUEST['acompanante_actividad_4']) && is_array($_REQUEST['acompanante_actividad_4'])) ? 'SI' : '';
+        $companion_actividad_5 = (isset($_REQUEST['acompanante_actividad_5']) && is_array($_REQUEST['acompanante_actividad_5'])) ? 'SI' : '';
+
+        // Actividad deportiva companion (validar con whitelist)
+        $companion_actividad_6 = '';
+        if(isset($_REQUEST['acompanantegolf']) && sanitize_text_field($_REQUEST['acompanantegolf']) != ''){
+            $companion_actividad_6 = '60';
+        }
+        if(isset($_REQUEST['acompanantepadel']) && sanitize_text_field($_REQUEST['acompanantepadel']) != ''){
+            $companion_actividad_6 = '57';
+        }
+        if(isset($_REQUEST['acompanantefutbol']) && sanitize_text_field($_REQUEST['acompanantefutbol']) != ''){
+            $companion_actividad_6 = '59';
+        }
+        if(isset($_REQUEST['acompanantetenis']) && sanitize_text_field($_REQUEST['acompanantetenis']) != ''){
+            $companion_actividad_6 = '58';
+        }
+
+        $companion_citytour = (isset($_REQUEST['acompanante_citytour']) && is_array($_REQUEST['acompanante_citytour'])) ? 'SI' : '';
+
+        // Talleres - sanitizar como integers
+        $taller_turno_1 = isset($_REQUEST['id_taller_1']) ? absint($_REQUEST['id_taller_1']) : 0;
+        $taller_turno_2 = isset($_REQUEST['id_taller_2']) ? absint($_REQUEST['id_taller_2']) : 0;
+        $mentor = isset($_REQUEST['mentor']) ? sanitize_text_field($_REQUEST['mentor']) : '';
+
+        // Tipo de companion para rutas
+        $tipo_companion_ruta = '';
         if(isset($_REQUEST['acompante_registrado'])){
-              $tipo_companion_ruta = $_REQUEST['acompante_registrado'];
-          }elseif(isset($_REQUEST['acompanante_inscrito'])){
-                 $tipo_companion_ruta = $_REQUEST['acompanante_inscrito'];
-          }elseif(isset($_REQUEST['acompanante_otro'])){
-                 $tipo_companion_ruta = $_REQUEST['acompanante_otro'];
-          }
-          
-   
+            $tipo_companion_ruta = sanitize_text_field($_REQUEST['acompante_registrado']);
+        }elseif(isset($_REQUEST['acompanante_inscrito'])){
+            $tipo_companion_ruta = sanitize_text_field($_REQUEST['acompanante_inscrito']);
+        }elseif(isset($_REQUEST['acompanante_otro'])){
+            $tipo_companion_ruta = sanitize_text_field($_REQUEST['acompanante_otro']);
+        }
+
+        // Companion name para actividad 2
+        $companion_name_actividad2 = isset($_REQUEST['companion_name1'])
+            ? sanitize_text_field($_REQUEST['companion_name1']) : '';
+
         $adicionales = array(
-          "tipo_habitacion" => $tipo_habitacion, 
-          //"fecha_habitacion" => $fechahab, 
-          "tipo_asistencia" => $tipo_asistencia, 
-          #"talla" => $talla, 
-          #"talla_companion" => $talla_companion,
-          "tipo_carrera" => $tipo_carrera, 
+          "tipo_habitacion" => $tipo_habitacion,
+          "tipo_asistencia" => $tipo_asistencia,
+          "tipo_carrera" => $tipo_carrera,
           "tipo_carrera_companion" => $tipo_carrera_companion,
-          "companion_actividad_1" => $companion_actividad_1, 
+          "companion_actividad_1" => $companion_actividad_1,
           "companion_actividad_2" => $companion_actividad_2,
           "companion_actividad_9" => $companion_actividad_9,
-          "companion_name_actividad2" => $_REQUEST['companion_name1'],
-          "tipo_companion_ruta"=>$tipo_companion_ruta,
-          "companion_actividad_6" => $companion_actividad_6, 
-          "companion_actividad_4" => $companion_actividad_4,  
-          #"companion_actividad_3" => $companion_citytour, 
-          "companion_actividad_5" => $companion_actividad_5, 
-          "taller_turno_1" => $taller_turno_1, 
+          "companion_name_actividad2" => $companion_name_actividad2,
+          "tipo_companion_ruta" => $tipo_companion_ruta,
+          "companion_actividad_6" => $companion_actividad_6,
+          "companion_actividad_4" => $companion_actividad_4,
+          "companion_actividad_5" => $companion_actividad_5,
+          "taller_turno_1" => $taller_turno_1,
           "taller_turno_2" => $taller_turno_2,  
           #"taller_especial" => $evento_actividad_id,  
           #"taller_master" => $evento_taller_id, 
@@ -771,19 +857,33 @@ function are_newConcept($request, $orden_id = '')
 {
     global $wpdb;
     global $blog_id;
-		$concepts = array();
-		
+    $concepts = array();
+
+    // SEGURIDAD: Sanitizar y validar user_type con whitelist
+    $user_type = isset($request["user_type"]) ? sanitize_text_field($request["user_type"]) : '';
+    $allowed_types = array('socio', 'student', 'invitado', 'Panelista', 'guest', 'no_socio', 'nosocio', 'miembro');
+    if (!in_array($user_type, $allowed_types)) {
+        return $concepts; // Retornar vacío si tipo inválido
+    }
+
+    // SEGURIDAD: Usar prepared statement para student
+    $student_concepto = $wpdb->get_var( $wpdb->prepare(
+        "SELECT valor FROM evento_meta WHERE evento_id = %d AND clave = %s",
+        absint($blog_id),
+        'id_concepto_student'
+    ));
+
     $conceptos_inscripcion = array(
-      'socio' => 1, 
-      'student' => $wpdb->get_var("SELECT valor FROM evento_meta WHERE evento_id = $blog_id and clave = 'id_concepto_student'"), 
-      'invitado' => 8, 
-      'Panelista' => 8, 
+      'socio' => 1,
+      'student' => $student_concepto,
+      'invitado' => 8,
+      'Panelista' => 8,
       'guest' => 8,
-      'no_socio' => 2,  
-      'nosocio' => 2, 
-      'miembro' => 2, 
+      'no_socio' => 2,
+      'nosocio' => 2,
+      'miembro' => 2,
     );
-    $id_concepto = $conceptos_inscripcion[$request["user_type"]];
+    $id_concepto = $conceptos_inscripcion[$user_type];
 		/*switch ($request["user_type"]) {
       case 'socio':
         $id_concepto = 1;
@@ -805,73 +905,120 @@ function are_newConcept($request, $orden_id = '')
         break;
     }	*/
 
-		// se agrega el concepto correspondiente
-		$nombreConcepto = $wpdb->get_var('SELECT nombre_es FROM evento_concepto WHERE id = '.$id_concepto);
-		$concepts[] = array('id' => $id_concepto,'titulo' => $nombreConcepto,'orden_id' => $orden_id,'costo' => $request["costo_final_usuario"] );
+    // SEGURIDAD: Usar prepared statement
+    $nombreConcepto = $wpdb->get_var( $wpdb->prepare(
+        "SELECT nombre_es FROM evento_concepto WHERE id = %d",
+        absint($id_concepto)
+    ));
+    // SEGURIDAD: Sanitizar costo
+    $costo_final_usuario = isset($request["costo_final_usuario"]) ? floatval($request["costo_final_usuario"]) : 0;
+    $concepts[] = array(
+        'id' => absint($id_concepto),
+        'titulo' => sanitize_text_field($nombreConcepto),
+        'orden_id' => absint($orden_id),
+        'costo' => $costo_final_usuario
+    );
 
-		// agrega conceptos de saldos a favor o deuda
-		if($request["saldoafavor"] < 0){
-			// Insertar concepto de saldo a favor del user a la orden
-			$nombreConcepto = $wpdb->get_var('SELECT nombre_es FROM evento_concepto WHERE id = 6');
-			$concepts[] = array('id' => 6,'titulo' => $nombreConcepto,'orden_id' => $orden_id,'costo' => $request["saldoafavor"] );
+    // agrega conceptos de saldos a favor o deuda
+    // SEGURIDAD: Sanitizar montos
+    $saldoafavor = isset($request["saldoafavor"]) ? floatval($request["saldoafavor"]) : 0;
+    if($saldoafavor < 0){
+        // SEGURIDAD: Usar prepared statement
+        $nombreConcepto = $wpdb->get_var( $wpdb->prepare(
+            "SELECT nombre_es FROM evento_concepto WHERE id = %d", 6
+        ));
+        $concepts[] = array('id' => 6,'titulo' => sanitize_text_field($nombreConcepto),'orden_id' => absint($orden_id),'costo' => $saldoafavor );
     }
-    if($request["saldodeuda"] > 0){
-			// Insertar concepto de deuda del user a la orden
-			$nombreConcepto = $wpdb->get_var('SELECT nombre_es FROM evento_concepto WHERE id = 5');
-			$concepts[] = array('id' => 5,'titulo' => $nombreConcepto,'orden_id' => $orden_id,'costo' => $request["saldodeuda"] );
-		}
-    if($request["costo_final_companion"] > 0){
-			// Insertar concepto por acompañante a la orden
-			$nombreConcepto = $wpdb->get_var('SELECT nombre_es FROM evento_concepto WHERE id = 3');
-			$concepts[] = array('id' => 3,'titulo' => $nombreConcepto,'orden_id' => $orden_id,'costo' => $request["costo_final_companion"] );
-		}
-	if($request["descuento"] < 0){
-			// Insertar concepto de saldo a favor del user a la orden
-			$nombreConcepto = $wpdb->get_var('SELECT nombre_es FROM evento_concepto WHERE id = 51');
-			$concepts[] = array('id' => 51,'titulo' => $nombreConcepto,'orden_id' => $orden_id,'costo' => $request["descuento"] );
+
+    $saldodeuda = isset($request["saldodeuda"]) ? floatval($request["saldodeuda"]) : 0;
+    if($saldodeuda > 0){
+        // SEGURIDAD: Usar prepared statement
+        $nombreConcepto = $wpdb->get_var( $wpdb->prepare(
+            "SELECT nombre_es FROM evento_concepto WHERE id = %d", 5
+        ));
+        $concepts[] = array('id' => 5,'titulo' => sanitize_text_field($nombreConcepto),'orden_id' => absint($orden_id),'costo' => $saldodeuda );
     }
-  if($_REQUEST['monto_donacion'] === 'Otro monto'){
-   $monto_donacion = $_REQUEST['otro_donacion'];
-  }else{
-  $monto_donacion = str_replace('USD ', '', $_REQUEST['monto_donacion']);
-  } 
-    $conceptos_actividades = 
-        array(
-          'id_concepto_social_1' => $_REQUEST['monto_actividad_1211'], // carrera 
-          'id_concepto_social_2' => $_REQUEST['monto_actividad_2210'], //ruta
-          'id_concepto_social_3' => $_REQUEST['monto_actividad_3'], //city tour
-          'id_concepto_social_4' => $_REQUEST['monto_actividad_6'], // Golf
-          'id_concepto_social_5' => $_REQUEST['monto_actividad_4'], // we
-          'id_concepto_social_9' => $_REQUEST['monto_actividad_9'], // cata de vino y maridaje
-        //'id_concepto_actividad_1' => $_REQUEST['monto_taller_especial'], 
-        //'id_concepto_taller_1' => $_REQUEST['numero223'],
-  		 'id_concepto_donacion' =>$monto_donacion,
-  		 'id_concepto_gorra' => $_REQUEST['subtotal_gorra'],
-         'id_concepto_termo' => $_REQUEST['subtotal_termo'],
-  		'id_concepto_bolso' => $_REQUEST['subtotal_bolso'],
-  'id_concepto_vaso' => $_REQUEST['subtotal_vaso'],
-      );
-  //print_r( $conceptos_actividades);die;
-      foreach ($conceptos_actividades as $key => $monto) {
-        if($monto > 0){
-          if($key=='id_concepto_social_1' and isset($_REQUEST['escribauna191'][0])){
-            $key = $key.'_acomp'; 
-          }
-          if($key=='id_concepto_social_2' and (isset($_REQUEST['companion_name1']) and $_REQUEST['companion_name1'] !="") ){
-            $key = $key.'_acomp';
-          }
-         if ($key == 'id_concepto_social_9' and (isset($_REQUEST['acompanante_actividad_9']) and $_REQUEST['acompanante_actividad_9'] != "")) {
-            $key = $key.'_acomp';
-          }
-          if ($key == 'id_concepto_social_5' and (isset($_REQUEST['acompanante_actividad_4']) and $_REQUEST['acompanante_actividad_4'] != "")) {
-            $key = $key.'_acomp';
-          }
-          
-          $id_concepto_actividad = $wpdb->get_var("SELECT valor FROM evento_meta WHERE evento_id = $blog_id and clave = '$key'");
-          $nombreConcepto = $wpdb->get_var('SELECT nombre_es FROM evento_concepto WHERE id = '.$id_concepto_actividad);
-          $concepts[] = array('id' => $id_concepto_actividad,'titulo' => $nombreConcepto,'orden_id' => $orden_id,'costo' => $monto );
+
+    $costo_final_companion = isset($request["costo_final_companion"]) ? floatval($request["costo_final_companion"]) : 0;
+    if($costo_final_companion > 0){
+        // SEGURIDAD: Usar prepared statement
+        $nombreConcepto = $wpdb->get_var( $wpdb->prepare(
+            "SELECT nombre_es FROM evento_concepto WHERE id = %d", 3
+        ));
+        $concepts[] = array('id' => 3,'titulo' => sanitize_text_field($nombreConcepto),'orden_id' => absint($orden_id),'costo' => $costo_final_companion );
+    }
+
+    $descuento = isset($request["descuento"]) ? floatval($request["descuento"]) : 0;
+    if($descuento < 0){
+        // SEGURIDAD: Usar prepared statement
+        $nombreConcepto = $wpdb->get_var( $wpdb->prepare(
+            "SELECT nombre_es FROM evento_concepto WHERE id = %d", 51
+        ));
+        $concepts[] = array('id' => 51,'titulo' => sanitize_text_field($nombreConcepto),'orden_id' => absint($orden_id),'costo' => $descuento );
+    }
+    // SEGURIDAD: Sanitizar monto de donación
+    $monto_donacion = 0;
+    if(isset($_REQUEST['monto_donacion'])){
+        $monto_donacion_input = sanitize_text_field($_REQUEST['monto_donacion']);
+        if($monto_donacion_input === 'Otro monto'){
+            $monto_donacion = isset($_REQUEST['otro_donacion']) ? floatval($_REQUEST['otro_donacion']) : 0;
+        }else{
+            $monto_donacion = floatval(str_replace('USD ', '', $monto_donacion_input));
         }
-      }
+    }
+
+    // SEGURIDAD: Sanitizar todos los montos de actividades
+    $conceptos_actividades = array(
+        'id_concepto_social_1' => isset($_REQUEST['monto_actividad_1211']) ? floatval($_REQUEST['monto_actividad_1211']) : 0,
+        'id_concepto_social_2' => isset($_REQUEST['monto_actividad_2210']) ? floatval($_REQUEST['monto_actividad_2210']) : 0,
+        'id_concepto_social_3' => isset($_REQUEST['monto_actividad_3']) ? floatval($_REQUEST['monto_actividad_3']) : 0,
+        'id_concepto_social_4' => isset($_REQUEST['monto_actividad_6']) ? floatval($_REQUEST['monto_actividad_6']) : 0,
+        'id_concepto_social_5' => isset($_REQUEST['monto_actividad_4']) ? floatval($_REQUEST['monto_actividad_4']) : 0,
+        'id_concepto_social_9' => isset($_REQUEST['monto_actividad_9']) ? floatval($_REQUEST['monto_actividad_9']) : 0,
+        'id_concepto_donacion' => $monto_donacion,
+        'id_concepto_gorra' => isset($_REQUEST['subtotal_gorra']) ? floatval($_REQUEST['subtotal_gorra']) : 0,
+        'id_concepto_termo' => isset($_REQUEST['subtotal_termo']) ? floatval($_REQUEST['subtotal_termo']) : 0,
+        'id_concepto_bolso' => isset($_REQUEST['subtotal_bolso']) ? floatval($_REQUEST['subtotal_bolso']) : 0,
+        'id_concepto_vaso' => isset($_REQUEST['subtotal_vaso']) ? floatval($_REQUEST['subtotal_vaso']) : 0,
+    );
+
+    foreach ($conceptos_actividades as $key => $monto) {
+        if($monto > 0){
+            // Verificar si tiene acompañante
+            if($key == 'id_concepto_social_1' && isset($_REQUEST['escribauna191'][0])){
+                $key = $key.'_acomp';
+            }
+            if($key == 'id_concepto_social_2' && (isset($_REQUEST['companion_name1']) && sanitize_text_field($_REQUEST['companion_name1']) != "") ){
+                $key = $key.'_acomp';
+            }
+            if ($key == 'id_concepto_social_9' && (isset($_REQUEST['acompanante_actividad_9']) && $_REQUEST['acompanante_actividad_9'] != "")) {
+                $key = $key.'_acomp';
+            }
+            if ($key == 'id_concepto_social_5' && (isset($_REQUEST['acompanante_actividad_4']) && $_REQUEST['acompanante_actividad_4'] != "")) {
+                $key = $key.'_acomp';
+            }
+
+            // SEGURIDAD: Usar prepared statements
+            $id_concepto_actividad = $wpdb->get_var( $wpdb->prepare(
+                "SELECT valor FROM evento_meta WHERE evento_id = %d AND clave = %s",
+                absint($blog_id),
+                $key
+            ));
+
+            if($id_concepto_actividad){
+                $nombreConcepto = $wpdb->get_var( $wpdb->prepare(
+                    "SELECT nombre_es FROM evento_concepto WHERE id = %d",
+                    absint($id_concepto_actividad)
+                ));
+                $concepts[] = array(
+                    'id' => absint($id_concepto_actividad),
+                    'titulo' => sanitize_text_field($nombreConcepto),
+                    'orden_id' => absint($orden_id),
+                    'costo' => $monto
+                );
+            }
+        }
+    }
     /*if($request["monto_actividad"] > 0){
 			// Insertar concepto por acompañante a la orden
       $id_concepto_actividad_2 = $wpdb->get_var("SELECT valor FROM evento_meta WHERE evento_id = $blog_id and clave = 'id_concepto_actividad_2'");
@@ -883,121 +1030,205 @@ function are_newConcept($request, $orden_id = '')
 }
 function are_verifyConcept($id_concepto = '', $orden_id = '')
 {
-  global $wpdb;
-		$verificar = $wpdb->get_var('SELECT evento_concepto_id FROM evento_orden_concepto WHERE evento_concepto_id = '.$id_concepto.' and evento_orden_id = '.$orden_id);
-		if (!$verificar) {
-			return false;
-		} else {
-			return $verificar;
-		}		
+    global $wpdb;
+
+    // SEGURIDAD: Sanitizar IDs y usar prepared statement
+    $id_concepto = absint($id_concepto);
+    $orden_id = absint($orden_id);
+
+    if($id_concepto == 0 || $orden_id == 0){
+        return false;
+    }
+
+    $verificar = $wpdb->get_var( $wpdb->prepare(
+        "SELECT evento_concepto_id FROM evento_orden_concepto WHERE evento_concepto_id = %d AND evento_orden_id = %d",
+        $id_concepto,
+        $orden_id
+    ));
+
+    if (!$verificar) {
+        return false;
+    } else {
+        return absint($verificar);
+    }
 }
 function are_insertConcept($id_concepto = '', $orden_id = '', $monto = 0)
 {
-  global $wpdb;
-		if ( !are_verifyConcept( $id_concepto , $orden_id ) ) {
-			$arrayColumnas = array(
-				'evento_concepto_id' => $id_concepto,
-				'evento_orden_id' => $orden_id,
-				'costo' => $monto
-			);
-			$insertConcepto = $wpdb->insert(
-				'evento_orden_concepto', 
-				$arrayColumnas
-			);
-		}	
+    global $wpdb;
+
+    // SEGURIDAD: Sanitizar parámetros
+    $id_concepto = absint($id_concepto);
+    $orden_id = absint($orden_id);
+    $monto = floatval($monto);
+
+    if ( !are_verifyConcept( $id_concepto , $orden_id ) ) {
+        $arrayColumnas = array(
+            'evento_concepto_id' => $id_concepto,
+            'evento_orden_id' => $orden_id,
+            'costo' => $monto
+        );
+        $insertConcepto = $wpdb->insert(
+            'evento_orden_concepto',
+            $arrayColumnas,
+            array('%d', '%d', '%f') // Format specifiers
+        );
+    }
 }
 function are_guardarDatosPersonales($request=array())
 {
     global $wpdb;
-    //$user_id = get_current_user_id();
-    $user_id = ($_REQUEST['id_usuario']) ? $_REQUEST['id_usuario'] : 9999 ;
-		if($user_id!=''){
-			// El usuario está registrado en la base de datos pero no deberia entrar aquí
 
-			// Insert details on buddypress xprofile
-      //$sql = 'SELECT id FROM country_names WHERE name_es = "'.$_POST['country'].'" OR name_en = "'.$_POST['country'].'"';
-      $country = '';
-      $id_country = '';
-      
-      //if($_REQUEST['user_type']!='socio'){
-          if ( $_REQUEST["pais"] != '' ) {
-              $country =  $_REQUEST["pais"];
-              $variable_nombre_pais = 'name_es';
-          }elseif( $_REQUEST["country"]!='' ){
-              $country =  $_REQUEST["country"];
-              $variable_nombre_pais = 'name_en';
-          }
-          $sql = 'SELECT id FROM country_names WHERE '.$variable_nombre_pais.' = "'.$country.'"';
-          $id_country = $wpdb->get_var($sql);
-	        //$country = $request["bill_address"][5];
-	    //}
-			
-            $telefono = $_REQUEST['telefono'];
-			$fecha_nacimiento = $request["fecha_nacimiento"]['year'].'-'.$request["fecha_nacimiento"]['month'].'-'.$request["fecha_nacimiento"]['day'];
+    // SEGURIDAD: Sanitizar user_id
+    $user_id = isset($_REQUEST['id_usuario']) ? absint($_REQUEST['id_usuario']) : 0;
+    if($user_id == 0){
+        return false;
+    }
 
-			$campos = array(
-				'first_name' => 		  array('field_id' => '1',	'value' => $_REQUEST['nombre']['first'], ),
-				'last_name' => 			  array('field_id' => '2',	'value' => $_REQUEST['nombre']['last'], ),
-				'city' => 				    array('field_id' => '9',	'value' => $request["direccion"]['city'], ),
-				'country' => 			    array('field_id' => '7',	'value' => $country, ),
-				//'company' => 			    array('field_id' => '12',	'value' => $request["compania"], ),
-				'gender' => 			    array('field_id' => '18',	'value' => $_REQUEST["genero"], ),
-				'id_country' => 		  array('field_id' => '44',	'value' => $id_country, ),
-				'personal-address' => array('field_id' => '3',	'value' => $request["direccion"]['addr_line1'], ),
-				'personal-state' => 	array('field_id' => '8',	'value' => $request["direccion"]['state'], ),
-				'personal-zip' => 		array('field_id' => '6',	'value' => $request["direccion"]['postal'], ),
-				'fecha-nacimiento' => array('field_id' => '34',	'value' => $fecha_nacimiento, ),
-				'telefono' => array('field_id' => '23',	'value' => $telefono, ),
-			);
-      if (isset($request["compania"])) {
-        if($request["compania"] != ''){
-          $campos['company'] = array('field_id' => '12',	'value' => $request["compania"], );
+    if($user_id > 0){
+        // Insert details on buddypress xprofile
+        $country = '';
+        $id_country = 0;
+
+        // SEGURIDAD: Sanitizar país y usar prepared statement
+        $pais_input = isset($_REQUEST["pais"]) ? sanitize_text_field($_REQUEST["pais"]) : '';
+        $country_input = isset($_REQUEST["country"]) ? sanitize_text_field($_REQUEST["country"]) : '';
+
+        if ( $pais_input != '' ) {
+            $country = $pais_input;
+            $variable_nombre_pais = 'name_es';
+        }elseif( $country_input != '' ){
+            $country = $country_input;
+            $variable_nombre_pais = 'name_en';
         }
-      }
-      if (isset($request["universidad"])) {
-        if($request["universidad"] != ''){
-          $campos['univ'] = array('field_id' => '47',	'value' => $request["universidad"], );
+
+        if($country != ''){
+            // SEGURIDAD: Usar prepared statement dinámico
+            if($variable_nombre_pais == 'name_es'){
+                $id_country = $wpdb->get_var( $wpdb->prepare(
+                    "SELECT id FROM country_names WHERE name_es = %s",
+                    $country
+                ));
+            }else{
+                $id_country = $wpdb->get_var( $wpdb->prepare(
+                    "SELECT id FROM country_names WHERE name_en = %s",
+                    $country
+                ));
+            }
+            $id_country = absint($id_country);
         }
-      }
+        // SEGURIDAD: Sanitizar teléfono y fecha de nacimiento
+        $telefono = isset($_REQUEST['telefono']) ? sanitize_text_field($_REQUEST['telefono']) : '';
+
+        $year = isset($request["fecha_nacimiento"]['year']) ? absint($request["fecha_nacimiento"]['year']) : 0;
+        $month = isset($request["fecha_nacimiento"]['month']) ? absint($request["fecha_nacimiento"]['month']) : 0;
+        $day = isset($request["fecha_nacimiento"]['day']) ? absint($request["fecha_nacimiento"]['day']) : 0;
+        $fecha_nacimiento = '';
+        if($year > 0 && $month > 0 && $day > 0){
+            $fecha_nacimiento = sprintf('%04d-%02d-%02d', $year, $month, $day);
+        }
+
+        // SEGURIDAD: Sanitizar todos los campos personales
+        $campos = array(
+            'first_name' => array(
+                'field_id' => '1',
+                'value' => isset($_REQUEST['nombre']['first']) ? sanitize_text_field($_REQUEST['nombre']['first']) : ''
+            ),
+            'last_name' => array(
+                'field_id' => '2',
+                'value' => isset($_REQUEST['nombre']['last']) ? sanitize_text_field($_REQUEST['nombre']['last']) : ''
+            ),
+            'city' => array(
+                'field_id' => '9',
+                'value' => isset($request["direccion"]['city']) ? sanitize_text_field($request["direccion"]['city']) : ''
+            ),
+            'country' => array(
+                'field_id' => '7',
+                'value' => $country
+            ),
+            'gender' => array(
+                'field_id' => '18',
+                'value' => isset($_REQUEST["genero"]) ? sanitize_text_field($_REQUEST["genero"]) : ''
+            ),
+            'id_country' => array(
+                'field_id' => '44',
+                'value' => $id_country
+            ),
+            'personal-address' => array(
+                'field_id' => '3',
+                'value' => isset($request["direccion"]['addr_line1']) ? sanitize_text_field($request["direccion"]['addr_line1']) : ''
+            ),
+            'personal-state' => array(
+                'field_id' => '8',
+                'value' => isset($request["direccion"]['state']) ? sanitize_text_field($request["direccion"]['state']) : ''
+            ),
+            'personal-zip' => array(
+                'field_id' => '6',
+                'value' => isset($request["direccion"]['postal']) ? sanitize_text_field($request["direccion"]['postal']) : ''
+            ),
+            'fecha-nacimiento' => array(
+                'field_id' => '34',
+                'value' => $fecha_nacimiento
+            ),
+            'telefono' => array(
+                'field_id' => '23',
+                'value' => $telefono
+            ),
+        );
+
+        if (isset($request["compania"]) && $request["compania"] != ''){
+            $campos['company'] = array(
+                'field_id' => '12',
+                'value' => sanitize_text_field($request["compania"])
+            );
+        }
+
+        if (isset($request["universidad"]) && $request["universidad"] != ''){
+            $campos['univ'] = array(
+                'field_id' => '47',
+                'value' => sanitize_text_field($request["universidad"])
+            );
+        }
           //var_dump($campos);
       
 
 
-			foreach ($campos as $nombreCampo => $datos) {
-				if ($datos['value']!='') {
-					$qry = "SELECT COUNT(*) FROM pwisa_bp_xprofile_data where field_id='".$datos['field_id']."' AND user_id=".$user_id;
-					
-					
-					$verify = $wpdb->get_var($qry);
-					if(!$verify){
-						//echo "entro aqui 1  ";
-						$wpdb->query( $wpdb->prepare( 
-							"INSERT INTO pwisa_bp_xprofile_data (user_id , field_id, value) VALUES (%d, %d, %s)", 
-							$user_id,
-							$datos['field_id'],
-							$datos['value']
-							) 
-						);
-					}else{
-						
-            if($datos['field_id']!=7 && $datos['field_id']!=44){
-              // si el campo a actualizar es distinto a pais
-              $wpdb->update( 
-                'pwisa_bp_xprofile_data', 
-                array( 'value' => $datos['value']), 
-                array( 'field_id' => $datos['field_id'],
-                  'user_id' => $user_id )		
-                );
+        foreach ($campos as $nombreCampo => $datos) {
+            if ($datos['value'] != '') {
+                // SEGURIDAD: Usar prepared statement
+                $verify = $wpdb->get_var( $wpdb->prepare(
+                    "SELECT COUNT(*) FROM pwisa_bp_xprofile_data WHERE field_id = %d AND user_id = %d",
+                    absint($datos['field_id']),
+                    $user_id
+                ));
+
+                if($verify == 0){
+                    $wpdb->query( $wpdb->prepare(
+                        "INSERT INTO pwisa_bp_xprofile_data (user_id, field_id, value) VALUES (%d, %d, %s)",
+                        $user_id,
+                        absint($datos['field_id']),
+                        sanitize_text_field($datos['value'])
+                    ));
+                }else{
+                    // No actualizar país si ya está guardado
+                    if($datos['field_id'] != 7 && $datos['field_id'] != 44){
+                        $wpdb->update(
+                            'pwisa_bp_xprofile_data',
+                            array( 'value' => sanitize_text_field($datos['value']) ),
+                            array(
+                                'field_id' => absint($datos['field_id']),
+                                'user_id' => $user_id
+                            ),
+                            array('%s'),
+                            array('%d', '%d')
+                        );
+                    }
+                }
             }
-					}
-				}
-					
-			}
-			return "guardado";
-		}else{
-				
-			return "error";
-		}
+        }
+        return "guardado";
+    }else{
+        return "error";
+    }
 }
 function are_guardarDatosFacturacion($request=array())
 {
