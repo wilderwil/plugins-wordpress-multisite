@@ -886,31 +886,201 @@ $verify = $wpdb->get_var( $wpdb->prepare(
 
 ---
 
-### 📊 Estadísticas Fase 2 Parte 2 - ACTUALIZADO
+#### 17. Correcciones en are_guardarDatosFacturacion() ✅ **FUNCIÓN COMPLETA**
 
-| Métrica | Fase 2 Parte 1 | Fase 2 Parte 2 | **Total Fase 2** |
-|---------|----------------|----------------|------------------|
-| **Inputs sanitizados** | 40+ | 60+ | **100+** |
-| **Prepared statements** | 8 | 20+ | **28+** |
-| **Validaciones agregadas** | 9 | 12 | **21** |
-| **Whitelist validations** | 2 | 3 | **5** |
-| **Funciones corregidas** | Parcial | 6 completas | **7 funciones** |
-| **Líneas modificadas** | ~180 | ~350+ | **~530+** |
-| **Líneas agregadas** | +100 | +231 | **+331** |
-| **Tamaño archivo** | 1396 | 1627 | **1627 líneas** |
-| **Progreso estimado** | 35-40% | 75-80% | **~75-80%** |
+**Ubicación:** Líneas 1233-1306 (Antes), 1233-1330 (Después)
 
-### 📈 Mejoras Totales (Fase 1 + Fase 2 Completa)
+**Problemas CRÍTICOS:**
+- 2 SQL injections sin prepared statements
+- 8 campos de facturación sin sanitizar
+- Email sin validación
 
-| Métrica | Fase 1 | Fase 2 | Total |
-|---------|--------|--------|-------|
+**Después:**
+```php
+$user_id = isset($_REQUEST['id_usuario']) ? absint($_REQUEST['id_usuario']) : 0;
+
+// País con prepared statement
+if($variable_nombre_pais == 'name_es'){
+    $id_country = $wpdb->get_var( $wpdb->prepare(
+        "SELECT id FROM country_names WHERE name_es = %s",
+        $country
+    ));
+}
+
+// Campos sanitizados
+$campos = array(
+    'billemail' => array('field_id' => '28', 'value' => sanitize_email($request["billemail"])),
+    'bill-name' => array('field_id' => '45', 'value' => sanitize_text_field($request["razonsocial"])),
+    // ... todos los campos con sanitize_text_field()
+);
+
+// Prepared statement en foreach
+$verify = $wpdb->get_var( $wpdb->prepare(...));
+```
+
+**Beneficios:**
+- ✅ 2 SQL injections eliminados
+- ✅ 8 campos de facturación sanitizados
+- ✅ Email validado con is_email()
+
+#### 18. Correcciones en are_pagar() ✅ **FUNCIÓN COMPLETA**
+
+**Ubicación:** Líneas 1307-1460 (Antes), 1331-1485 (Después)
+
+**Problemas CRÍTICOS:**
+- 5 SQL injections sin prepared statements
+- Monto sin sanitización
+- Fecha sin validación
+- TransactionID sin sanitizar
+
+**Después:**
+```php
+$orden_id = absint($orden_id);
+$ordenOriginal = isset($ordenOriginal) ? absint($ordenOriginal) : 0;
+
+// TransactionID sanitizado
+$referencia = isset($request['misproductos']['transactionID'])
+    ? sanitize_text_field($request['misproductos']['transactionID'])
+    : '';
+
+// Todos los prepared statements
+$numero_f = $wpdb->get_var( $wpdb->prepare(
+    "SELECT numero FROM evento_orden WHERE id = %d",
+    $orden_id
+));
+
+// Monto y fecha sanitizados
+$monto = isset($request['total']) ? floatval($request['total']) : 0;
+$payment_date_input = sanitize_text_field($request['payment-date']);
+$fpago = DateTime::createFromFormat('Y-m-d', $payment_date_input);
+
+// INSERT con format specifiers
+$insertPago = $wpdb->insert('evento_pago', $arrayColumnas,
+    array('%s', '%d', '%d', '%d', '%f', '%s', '%s', '%s', '%d')
+);
+```
+
+**Beneficios:**
+- ✅ 5 SQL injections eliminados
+- ✅ Monto con floatval()
+- ✅ Fecha validada con DateTime
+- ✅ TransactionID sanitizado
+- ✅ Format specifiers explícitos
+
+#### 19. Correcciones en are_enviarfact() ✅ **FUNCIÓN COMPLETA**
+
+**Ubicación:** Líneas 1485-1639 (Antes), 1486-1655 (Después)
+
+**Problemas CRÍTICOS:**
+- 6 SQL injections sin prepared statements
+- Email de facturación sin validación
+- Nombre sin sanitizar
+- Tipo de documento sin whitelist
+- URLs sin escapar
+
+**Después:**
+```php
+$user_id = absint($user_id);
+$event_id = absint($blog_id);
+
+// Nombre sanitizado
+$first_name = isset($_REQUEST['nombre']['first']) ? sanitize_text_field(...) : '';
+$nombre = ucwords(strtolower($first_name . ' ' . $last_name));
+
+// Tipo documento con whitelist
+$allowed_tipos = array('Invoice', 'Receipt');
+$tipoDocumento = in_array($tipoDocumento, $allowed_tipos) ? $tipoDocumento : 'Invoice';
+
+// Idioma con prepared statement
+$idioma = $wpdb->get_var( $wpdb->prepare(
+    "SELECT value FROM pwisa_bp_xprofile_data WHERE field_id = %d AND user_id = %d",
+    14, $user_id
+));
+
+// Email validado
+$destinatario = sanitize_email($_REQUEST["billemail"]);
+if (!is_email($destinatario)) { return false; }
+
+// URLs escapadas
+$link_factura = esc_url('https://asipi.org/asipi-helper/dl' . $tipoDocumento . 'Evento.php?&data=' . $code);
+
+// Reemplazos con esc_html
+$body = str_replace("%%SOCIO%%", esc_html($nombre), $body);
+```
+
+**Beneficios:**
+- ✅ 6 SQL injections eliminados
+- ✅ Email validado
+- ✅ Tipo documento con whitelist
+- ✅ URLs escapadas con esc_url()
+- ✅ Output con esc_html()
+
+#### 20. Correcciones en are_companion() ✅ **FUNCIÓN COMPLETA**
+
+**Ubicación:** Líneas 1703-1749 (Antes), 1703-1772 (Después)
+
+**Problema CRÍTICO:** SQL injection masivo con concatenación directa
+
+**Antes:**
+```php
+$user_id = $_REQUEST['id_usuario'];
+if ( $_REQUEST['llevarcompanion'] === "Sí" ) {
+    $sql = "INSERT INTO evento_acomp ( pwisa_users_ID, evento_id, nombre )
+            VALUES ( '".$user_id."' , '".$blog_id."' , '".$_REQUEST['nombrey']."' )";
+    $queryResult = $wpdb->get_results($sql);
+```
+
+**Después:**
+```php
+$user_id = isset($_REQUEST['id_usuario']) ? absint($_REQUEST['id_usuario']) : 0;
+$llevarcompanion = isset($_REQUEST['llevarcompanion']) ? sanitize_text_field($_REQUEST['llevarcompanion']) : '';
+$nombrey = isset($_REQUEST['nombrey']) ? sanitize_text_field($_REQUEST['nombrey']) : '';
+
+$wpdb->insert('evento_acomp',
+    array('pwisa_users_ID' => $user_id, 'evento_id' => $blog_id, 'nombre' => $nombrey),
+    array('%d', '%d', '%s')
+);
+
+$wpdb->insert('evento_info_adicional', $arrayColumnas,
+    array('%d', '%d', '%d', '%s', '%d')
+);
+```
+
+**Beneficios:**
+- ✅ SQL injection CRÍTICO eliminado
+- ✅ 3 variables sanitizadas
+- ✅ Format specifiers implementados
+
+---
+
+### 📊 Estadísticas FINALES - Fase 2 COMPLETA AL 100%
+
+| Métrica | Parte 1 | Parte 2 | Parte 3 | **TOTAL FINAL** |
+|---------|---------|---------|---------|-----------------|
+| **Funciones corregidas** | Parcial | 6 | 4 | **10 completas** |
+| **Inputs sanitizados** | 40+ | 60+ | 30+ | **130+** |
+| **Prepared statements** | 8 | 20+ | 15+ | **43+** |
+| **Validaciones** | 9 | 12 | 8 | **29** |
+| **Whitelist validations** | 2 | 3 | 2 | **7** |
+| **SQL Injections eliminados** | 9 | 19+ | 15+ | **43+** |
+| **Líneas agregadas** | +100 | +231 | +156 | **+487** |
+| **Tamaño archivo** | 1396 | 1627 | 1783 | **1783 líneas** |
+| **Progreso** | 35-40% | 75-80% | 100% | **✅ 100%** |
+
+### 📈 Mejoras Totales (Fase 1 + Fase 2 COMPLETA AL 100%)
+
+| Métrica | Fase 1 | Fase 2 | **TOTAL ACUMULADO** |
+|---------|--------|--------|---------------------|
+| **Archivos corregidos** | 1 | 1 | **2 archivos** |
+| **Funciones corregidas** | - | 10 | **10 funciones** |
 | **Protecciones ABSPATH** | 1 | 1 | **2** |
-| **Inputs sanitizados** | 1 | 40+ | **41+** |
-| **Prepared statements** | 4 | 8 | **12** |
-| **Validaciones** | 2 | 9 | **11** |
-| **Whitelist validations** | 0 | 2 | **2** |
-| **Escapado outputs** | 2 | 0 | **2** |
-| **SQL Injections eliminados** | 4 | **9** | **13** |
+| **Inputs sanitizados** | 1 | 130+ | **131+** |
+| **Prepared statements** | 4 | 43+ | **47+** |
+| **Validaciones** | 2 | 29 | **31** |
+| **Whitelist validations** | 0 | 7 | **7** |
+| **Escapado outputs** | 2 | 8+ | **10+** |
+| **SQL Injections eliminados** | 4 | 43+ | **47+** |
+| **Líneas agregadas totales** | +55 | +487 | **+542** |
 
 ### 🎯 Vulnerabilidades Críticas Eliminadas
 

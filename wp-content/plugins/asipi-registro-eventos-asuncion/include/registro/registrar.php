@@ -1232,253 +1232,379 @@ function are_guardarDatosPersonales($request=array())
 }
 function are_guardarDatosFacturacion($request=array())
 {
-  global $wpdb;
-    //$user_id = get_current_user_id();
-    $user_id = ($_REQUEST['id_usuario']) ? $_REQUEST['id_usuario'] : 9999 ;
-		if($user_id!=''){
-			// El usuario está registrado en la base de datos pero no deberia entrar aquí
+    global $wpdb;
 
-			// Insert details on buddypress xprofile
-			//$sql = 'SELECT id FROM country_names WHERE name_es = "'.$_POST['country'].'" OR name_en = "'.$_POST['country'].'"';
-			//$sql = 'SELECT name_es FROM country_names WHERE id = "'.$request["bill_address"][5].'"';
-			//$id_country = $wpdb->get_var($sql);
-
-			$country = '';
-		    $id_country = '';
-		    //if($_REQUEST['user_type']!='socio'){
-		    	if ( $request["pais"] != '' ) {
-				    $country =  $request["pais"];
-				    $variable_nombre_pais = 'name_es';
-          }elseif( $request["country"]!= '' ){
-            $country =  $request["country"];
-            $variable_nombre_pais = 'name_en';
-          }
-				$sql = 'SELECT id FROM country_names WHERE '.$variable_nombre_pais.' = "'.$country.'"';
-				$id_country = $wpdb->get_var($sql);
-		        //$country = $request["bill_address"][5];
-		    //}
-
-			//echo $id_country.' - ';
-			//echo $sql;
-			$campos = array(
-				'billemail' => 		array('field_id' => '28',	'value' => $request["billemail"], ),
-				'bill-name' => 		array('field_id' => '45',	'value' => $request["razonsocial"], ),
-				'bill-city' => 		array('field_id' => '32',	'value' => $request["bill_address"]['city'], ),
-				'bill-nit' => 		array('field_id' => '46',	'value' => $request["nit"], ),
-				'bill-country' => array('field_id' => '30',	'value' => $country, ),
-				'bill_address' => array('field_id' => '29',	'value' => $request["bill_address"]['addr_line1'], ),
-				'bill-state' => 	array('field_id' => '31',	'value' => $request["bill_address"]['state'], ),
-				'bill-zip' => 		array('field_id' => '33',	'value' => $request["bill_address"]['postal'], ),
-			);
-
-			foreach ($campos as $nombreCampo => $datos) {
-				if ($datos['value']!='') {
-					$qry = "SELECT COUNT(*) FROM pwisa_bp_xprofile_data where field_id='".$datos['field_id']."' AND user_id=".$user_id;
-					//echo '   '.$qry.'<br>';
-					
-					$verify = $wpdb->get_var($qry);
-					if(!$verify){
-						//echo "entro aqui 1  ";
-						$wpdb->query( $wpdb->prepare( 
-							"INSERT INTO pwisa_bp_xprofile_data (user_id , field_id, value) VALUES (%d, %d, %s)", 
-							$user_id,
-							$datos['field_id'],
-							$datos['value']
-							) 
-						);
-					}else{
-						//echo "entro aqui 2  ";
-						$wpdb->update( 
-							'pwisa_bp_xprofile_data', 
-							array( 'value' => $datos['value']), 
-							array( 'field_id' => $datos['field_id'],
-								'user_id' => $user_id )		
-							);
-					}
-				}
-					
-			}
-			return "guardado";
-		}else{
-				
-			return "error";
-		}
-}
-function are_pagar($request, $orden_id, $today,$ordenOriginal=null)
-{
-  global $wpdb;
-
-  $pay_status = 'C';
-  //if (isset($request['misproductos']['transactionID'])) {
-    $referencia = $request['misproductos']['transactionID'];
-    $pay_mode = 5;//'Paypal';
-  /*  
-  }else{
-    if($_REQUEST['forma_pago']=='Transferencia'){
-      $referencia = '';//$_REQUEST['num_referencia'];
-      $pay_status = 'P';
-      $pay_mode = 1;// 'Transferencia Bancaria';
-    }else{
-      $referencia = 'free';
-      $pay_mode = 4;// 'Tesoreria';
+    // SEGURIDAD: Sanitizar user_id
+    $user_id = isset($_REQUEST['id_usuario']) ? absint($_REQUEST['id_usuario']) : 0;
+    if($user_id == 0){
+        return "error";
     }
-      
-  }*/
-  //if (isset($request['misproductos']['transactionIDactionID'])) {
-    //if (isset($request['total'])) {
-        $numero_f = $wpdb->get_var("SELECT numero FROM evento_orden WHERE id = ".$orden_id);
-        //calcular numero de pago
-        $pagos = $wpdb->get_var('SELECT count(*) FROM evento_pago WHERE evento_orden_id="' . $orden_id . '"');
-        #$pagos = $wpdb->get_var('SELECT max(subnumero) FROM `evento_pago` where evento_orden_id >= "' . $orden_id . '" and numero = (select numero from evento_pago where evento_orden_id ="' . $orden_id . '" limit 1)');
 
-        if(isset($ordenOriginal) && $ordenOriginal!= null){
-            $subnumero = $wpdb->get_var('SELECT max(subnumero) FROM `evento_pago` where evento_orden_id >= "' . $ordenOriginal . '" and numero = (select numero from evento_pago where evento_orden_id ="' . $ordenOriginal. '" limit 1)');
-            $subnumero = $subnumero +1;
-            
-        }else{
-            $subnumero =1;
+    if($user_id > 0){
+        $country = '';
+        $id_country = 0;
+
+        // SEGURIDAD: Sanitizar país y usar prepared statement
+        $pais_input = isset($request["pais"]) ? sanitize_text_field($request["pais"]) : '';
+        $country_input = isset($request["country"]) ? sanitize_text_field($request["country"]) : '';
+
+        if ( $pais_input != '' ) {
+            $country = $pais_input;
+            $variable_nombre_pais = 'name_es';
+        }elseif( $country_input != '' ){
+            $country = $country_input;
+            $variable_nombre_pais = 'name_en';
         }
-        
 
-        if ((int) $pagos > 0) {
-            $suffix = $pagos + 1;
-            $numeroReceipt = $numero_f . '-' . $suffix;
-            $last_payment = $wpdb->get_var('SELECT numero FROM evento_pago where evento_orden_id = ' . $orden_id . ' order by id desc limit 1');
-            if (strcmp($numeroReceipt, $last_payment) == 0) {
-                $suffix += 1;
-                $numeroReceipt = $numero_f . '-' . $suffix;
+        if($country != ''){
+            // SEGURIDAD: Usar prepared statement
+            if($variable_nombre_pais == 'name_es'){
+                $id_country = $wpdb->get_var( $wpdb->prepare(
+                    "SELECT id FROM country_names WHERE name_es = %s",
+                    $country
+                ));
+            }else{
+                $id_country = $wpdb->get_var( $wpdb->prepare(
+                    "SELECT id FROM country_names WHERE name_en = %s",
+                    $country
+                ));
             }
-        } else {
-            $numeroReceipt = $numero_f;
+            $id_country = absint($id_country);
         }
-        $arrayColumnas = array(
-            'numero' => $numeroReceipt,
-            'subnumero' => $subnumero, 
-            'evento_orden_id' => $orden_id,
-            'tipo' => $pay_mode,
-            'monto' => $request['total'],
-            'descripcion' => $referencia,
-            'estado' => $pay_status,
-            'fecha' => $today,
-            'visible' => 1
-        );
-        if ($request['payment-date'] != "") {
-            $fpago = new DateTime($request['payment-date']);
-            $arrayColumnas['fecha'] = date_format($fpago, 'Y-m-d');
-        }
-        $insertPago = $wpdb->insert(
-                'evento_pago', $arrayColumnas
+
+        // SEGURIDAD: Sanitizar todos los campos de facturación
+        $campos = array(
+            'billemail' => array(
+                'field_id' => '28',
+                'value' => isset($request["billemail"]) ? sanitize_email($request["billemail"]) : ''
+            ),
+            'bill-name' => array(
+                'field_id' => '45',
+                'value' => isset($request["razonsocial"]) ? sanitize_text_field($request["razonsocial"]) : ''
+            ),
+            'bill-city' => array(
+                'field_id' => '32',
+                'value' => isset($request["bill_address"]['city']) ? sanitize_text_field($request["bill_address"]['city']) : ''
+            ),
+            'bill-nit' => array(
+                'field_id' => '46',
+                'value' => isset($request["nit"]) ? sanitize_text_field($request["nit"]) : ''
+            ),
+            'bill-country' => array(
+                'field_id' => '30',
+                'value' => $country
+            ),
+            'bill_address' => array(
+                'field_id' => '29',
+                'value' => isset($request["bill_address"]['addr_line1']) ? sanitize_text_field($request["bill_address"]['addr_line1']) : ''
+            ),
+            'bill-state' => array(
+                'field_id' => '31',
+                'value' => isset($request["bill_address"]['state']) ? sanitize_text_field($request["bill_address"]['state']) : ''
+            ),
+            'bill-zip' => array(
+                'field_id' => '33',
+                'value' => isset($request["bill_address"]['postal']) ? sanitize_text_field($request["bill_address"]['postal']) : ''
+            ),
         );
 
-        ///$pago_id = $wpdb->insert_id;
-        $sql = "SELECT id FROM evento_pago WHERE visible=1 and numero='$numeroReceipt' and evento_orden_id=$orden_id";
-        $pago_id = $wpdb->get_var( $sql );
-        
-        if (!$insertPago) {
-            return 0;
-        } else {
-            // Success
-            // Si el pago se marca como completado se resta
-            if ( $pay_status == "C" ) {
-                // Restar saldo de eventos
-                
-                $payment_user = $wpdb->get_var("SELECT pwisa_users_ID FROM evento_orden WHERE id = ".$orden_id);
-                //evento_modificar_saldo($payment_user, $request['total'], true);
-                //are_actualizarTesoCuenta($orden_id, $payment_user);
-                //Verificar si la orden esta completada
-                //teso_verificar_orden_completa_evento($orden_id);
-              
+        foreach ($campos as $nombreCampo => $datos) {
+            if ($datos['value'] != '') {
+                // SEGURIDAD: Usar prepared statement
+                $verify = $wpdb->get_var( $wpdb->prepare(
+                    "SELECT COUNT(*) FROM pwisa_bp_xprofile_data WHERE field_id = %d AND user_id = %d",
+                    absint($datos['field_id']),
+                    $user_id
+                ));
+
+                if($verify == 0){
+                    $wpdb->query( $wpdb->prepare(
+                        "INSERT INTO pwisa_bp_xprofile_data (user_id, field_id, value) VALUES (%d, %d, %s)",
+                        $user_id,
+                        absint($datos['field_id']),
+                        sanitize_text_field($datos['value'])
+                    ));
+                }else{
+                    $wpdb->update(
+                        'pwisa_bp_xprofile_data',
+                        array( 'value' => sanitize_text_field($datos['value']) ),
+                        array(
+                            'field_id' => absint($datos['field_id']),
+                            'user_id' => $user_id
+                        ),
+                        array('%s'),
+                        array('%d', '%d')
+                    );
+                }
             }
-            return $pago_id;
         }
-    //}
-  //}
+        return "guardado";
+    }else{
+        return "error";
+    }
 }
+function are_pagar($request, $orden_id, $today, $ordenOriginal=null)
+{
+    global $wpdb;
+
+    // SEGURIDAD: Sanitizar parámetros
+    $orden_id = absint($orden_id);
+    $ordenOriginal = isset($ordenOriginal) ? absint($ordenOriginal) : 0;
+
+    $pay_status = 'C';
+    // SEGURIDAD: Sanitizar transactionID
+    $referencia = isset($request['misproductos']['transactionID'])
+        ? sanitize_text_field($request['misproductos']['transactionID'])
+        : '';
+    $pay_mode = 5; //'Paypal'
+
+    // SEGURIDAD: Usar prepared statement
+    $numero_f = $wpdb->get_var( $wpdb->prepare(
+        "SELECT numero FROM evento_orden WHERE id = %d",
+        $orden_id
+    ));
+
+    // Calcular numero de pago - SEGURIDAD: Usar prepared statement
+    $pagos = $wpdb->get_var( $wpdb->prepare(
+        "SELECT COUNT(*) FROM evento_pago WHERE evento_orden_id = %d",
+        $orden_id
+    ));
+
+    if($ordenOriginal > 0){
+        // SEGURIDAD: Usar prepared statement con subquery
+        $subnumero = $wpdb->get_var( $wpdb->prepare(
+            "SELECT MAX(subnumero) FROM evento_pago
+             WHERE evento_orden_id >= %d
+             AND numero = (SELECT numero FROM evento_pago WHERE evento_orden_id = %d LIMIT 1)",
+            $ordenOriginal,
+            $ordenOriginal
+        ));
+        $subnumero = absint($subnumero) + 1;
+    }else{
+        $subnumero = 1;
+    }
+
+    if (absint($pagos) > 0) {
+        $suffix = absint($pagos) + 1;
+        $numeroReceipt = sanitize_text_field($numero_f) . '-' . $suffix;
+
+        // SEGURIDAD: Usar prepared statement
+        $last_payment = $wpdb->get_var( $wpdb->prepare(
+            "SELECT numero FROM evento_pago WHERE evento_orden_id = %d ORDER BY id DESC LIMIT 1",
+            $orden_id
+        ));
+
+        if (strcmp($numeroReceipt, $last_payment) == 0) {
+            $suffix += 1;
+            $numeroReceipt = sanitize_text_field($numero_f) . '-' . $suffix;
+        }
+    } else {
+        $numeroReceipt = sanitize_text_field($numero_f);
+    }
+
+    // SEGURIDAD: Sanitizar monto y fecha
+    $monto = isset($request['total']) ? floatval($request['total']) : 0;
+    $payment_date = $today;
+    if (isset($request['payment-date']) && $request['payment-date'] != "") {
+        $payment_date_input = sanitize_text_field($request['payment-date']);
+        $fpago = DateTime::createFromFormat('Y-m-d', $payment_date_input);
+        if($fpago !== false){
+            $payment_date = $fpago->format('Y-m-d');
+        }
+    }
+
+    $arrayColumnas = array(
+        'numero' => $numeroReceipt,
+        'subnumero' => absint($subnumero),
+        'evento_orden_id' => $orden_id,
+        'tipo' => absint($pay_mode),
+        'monto' => $monto,
+        'descripcion' => $referencia,
+        'estado' => sanitize_text_field($pay_status),
+        'fecha' => $payment_date,
+        'visible' => 1
+    );
+
+    $insertPago = $wpdb->insert(
+        'evento_pago',
+        $arrayColumnas,
+        array('%s', '%d', '%d', '%d', '%f', '%s', '%s', '%s', '%d')
+    );
+
+    // SEGURIDAD: Usar prepared statement para obtener pago_id
+    $pago_id = $wpdb->get_var( $wpdb->prepare(
+        "SELECT id FROM evento_pago WHERE visible = 1 AND numero = %s AND evento_orden_id = %d",
+        $numeroReceipt,
+        $orden_id
+    ));
+        
+    if (!$insertPago) {
+        return 0;
+    } else {
+        // Success
+        // Si el pago se marca como completado se resta
+        if ( $pay_status == "C" ) {
+            // SEGURIDAD: Usar prepared statement
+            $payment_user = $wpdb->get_var( $wpdb->prepare(
+                "SELECT pwisa_users_ID FROM evento_orden WHERE id = %d",
+                $orden_id
+            ));
+            //evento_modificar_saldo($payment_user, $request['total'], true);
+            //are_actualizarTesoCuenta($orden_id, $payment_user);
+            //Verificar si la orden esta completada
+            //teso_verificar_orden_completa_evento($orden_id);
+        }
+        return absint($pago_id);
+    }
+}
+
 function are_actualizarTesoCuenta($orden_id, $user_id)
 {
     global $wpdb;
+
+    // SEGURIDAD: Sanitizar IDs
+    $orden_id = absint($orden_id);
+    $user_id = absint($user_id);
+
     $mtoFavor = false;
     $total = 0;
-    $queryResult = $wpdb->get_results('SELECT evento_concepto_id, costo FROM evento_orden_concepto where evento_orden_id =' . $orden_id);
+
+    // SEGURIDAD: Usar prepared statement
+    $queryResult = $wpdb->get_results( $wpdb->prepare(
+        "SELECT evento_concepto_id, costo FROM evento_orden_concepto WHERE evento_orden_id = %d",
+        $orden_id
+    ));
+
     if (count($queryResult) > 0) {
         foreach ($queryResult as $data) {
-            if ($data->evento_concepto_id == 6) {
-                $mtoFavor = $data->costo;
+            if (absint($data->evento_concepto_id) == 6) {
+                $mtoFavor = floatval($data->costo);
             }
-            $total+=$data->costo;
+            $total += floatval($data->costo);
         }
     }
 
-    if ($mtoFavor and $total >= 0) {
-        //echo 'pone saldo a favor en teso';
-        $wpdb->update( 
-                'pwisa_teso_cuenta', 
-                array( 'saldo' => 0),
-                array( 'pwisa_users_ID' => $user_id )
-            );
+    if ($mtoFavor && $total >= 0) {
+        $wpdb->update(
+            'pwisa_teso_cuenta',
+            array( 'saldo' => 0 ),
+            array( 'pwisa_users_ID' => $user_id ),
+            array('%d'),
+            array('%d')
+        );
     }
 }
 function are_enviarfact($user_id, $orden_id, $tipoDocumento, $formaPagoMail, $tipoAsistenciaMail, $code){
-  
-  global $wpdb;
-  global $blog_id;
 
-  $event_id = $blog_id;
+    global $wpdb;
+    global $blog_id;
 
-  $nombre = ucwords(strtolower($_REQUEST['nombre']['first'].' '.$_REQUEST['nombre']['last'])); 
-  /*Busco los parametros de configuración (plantillas en ingles y español y la ruta de la carpeta de archivos pdf */
-  $qry = "SELECT value FROM pwisa_bp_xprofile_data where field_id='14' AND user_id=".$user_id;
-  if($idioma = $wpdb->get_var($qry)){
-    
-    if(!strcmp($idioma,'Español') || !strcmp($idioma,'Portugués') ){
-        $lang = 'es';
+    // SEGURIDAD: Sanitizar IDs
+    $user_id = absint($user_id);
+    $orden_id = absint($orden_id);
+    $event_id = absint($blog_id);
+
+    // SEGURIDAD: Sanitizar nombre
+    $first_name = isset($_REQUEST['nombre']['first']) ? sanitize_text_field($_REQUEST['nombre']['first']) : '';
+    $last_name = isset($_REQUEST['nombre']['last']) ? sanitize_text_field($_REQUEST['nombre']['last']) : '';
+    $nombre = ucwords(strtolower($first_name . ' ' . $last_name));
+
+    // SEGURIDAD: Usar prepared statement para obtener idioma
+    $idioma = $wpdb->get_var( $wpdb->prepare(
+        "SELECT value FROM pwisa_bp_xprofile_data WHERE field_id = %d AND user_id = %d",
+        14,
+        $user_id
+    ));
+
+    if($idioma){
+        if(!strcmp($idioma, 'Español') || !strcmp($idioma, 'Portugués') ){
+            $lang = 'es';
+        }else{
+            $lang = 'en';
+        }
     }else{
-        $lang = 'en';
+        $idioma = "Español";
+        $lang = 'es';
     }
-  }
-  else{
-      $idioma = "Español";
-      $lang = 'es';
-  }
-  
-  
-  $strTipoEmail = 'event'.$tipoDocumento;
-  $strTipoEmail = 'eventInvoice';
-  $queryResult = $wpdb->get_results("select * from teso_config where clave in ('".$strTipoEmail."subject-es','".$strTipoEmail."subject-en','".$strTipoEmail."body-es','".$strTipoEmail."body-en','pdf-folder')");
-  
-  
 
-  $nombre_evento = $wpdb->get_var("SELECT valor FROM evento_meta WHERE evento_id = ".$event_id." AND clave = 'name_".$lang."'");
-  $nombre_evento_largo = $wpdb->get_var("SELECT valor FROM evento_meta WHERE evento_id = ".$event_id." AND clave = 'name_".$lang."'");
+    // SEGURIDAD: Sanitizar tipo de documento con whitelist
+    $allowed_tipos = array('Invoice', 'Receipt');
+    $tipoDocumento = in_array($tipoDocumento, $allowed_tipos) ? $tipoDocumento : 'Invoice';
 
-  $tesorero = $wpdb->get_var("SELECT valor FROM evento_meta WHERE evento_id = '".$event_id."' AND clave = 'email_tesorero'");
-  //$header_factura = get_home_url();
-  $header_factura = $wpdb->get_var("SELECT valor FROM evento_meta WHERE evento_id = ".$event_id." AND clave = 'header_".$lang."'");
-  $fields = array();  
-  foreach($queryResult as $row){
-      $fields[$row->clave] = $row->valor;
-  }
+    $strTipoEmail = 'eventInvoice';
 
-  
-  $destinatario = $_REQUEST["billemail"];
- 
-  // SUJETO DEL MAIL
-  $subject = $fields[$strTipoEmail.'subject-'.$lang];
+    // SEGURIDAD: Usar prepared statement con IN clause
+    $queryResult = $wpdb->get_results( $wpdb->prepare(
+        "SELECT * FROM teso_config WHERE clave IN (%s, %s, %s, %s, %s)",
+        $strTipoEmail.'subject-es',
+        $strTipoEmail.'subject-en',
+        $strTipoEmail.'body-es',
+        $strTipoEmail.'body-en',
+        'pdf-folder'
+    ));
 
-  // BODY DEL MAIL
-  $claveBody = 'emailBody-'.$lang.'-'.$tipoDocumento.'-'.$tipoAsistenciaMail.'-'.$formaPagoMail; //emailBody-es-invoice-presencial-transferencia
-  $body = $wpdb->get_var("SELECT valor FROM evento_meta WHERE evento_id = ".$event_id." AND clave = '".$claveBody."'");
+    // SEGURIDAD: Validar lang con whitelist
+    $lang = in_array($lang, array('es', 'en')) ? $lang : 'es';
 
-  
-  $asipiPath = $_SERVER['DOCUMENT_ROOT'];
-  //$code = base64_encode(base64_encode(base64_encode($orden_id)));
-  //dlInvoiceEvento.php o dlReceiptEvento.php
-  $link2='';
-  if(strcmp($formaPagoMail,'Paypal') === 0){
-         $code_link2 = base64_encode(base64_encode(base64_encode($orden_id)));
-         $link2 = 'https://asipi.org/asipi-helper/dlInvoiceEvento.php?&data='. $code_link2;
+    // SEGURIDAD: Usar prepared statements para todas las consultas
+    $nombre_evento = $wpdb->get_var( $wpdb->prepare(
+        "SELECT valor FROM evento_meta WHERE evento_id = %d AND clave = %s",
+        $event_id,
+        'name_' . $lang
+    ));
+
+    $nombre_evento_largo = $nombre_evento; // Mismo valor
+
+    $tesorero = $wpdb->get_var( $wpdb->prepare(
+        "SELECT valor FROM evento_meta WHERE evento_id = %d AND clave = %s",
+        $event_id,
+        'email_tesorero'
+    ));
+
+    $header_factura = $wpdb->get_var( $wpdb->prepare(
+        "SELECT valor FROM evento_meta WHERE evento_id = %d AND clave = %s",
+        $event_id,
+        'header_' . $lang
+    ));
+
+    $fields = array();
+    foreach($queryResult as $row){
+        $fields[sanitize_key($row->clave)] = $row->valor;
     }
-  $link_factura = 'https://asipi.org/asipi-helper/dl'.$tipoDocumento.'Evento.php?&data='.$code;
+
+    // SEGURIDAD: Sanitizar email de facturación
+    $destinatario = isset($_REQUEST["billemail"]) ? sanitize_email($_REQUEST["billemail"]) : '';
+    if (!is_email($destinatario)) {
+        return false;
+    }
+
+    // SUJETO DEL MAIL
+    $subject = isset($fields[$strTipoEmail.'subject-'.$lang]) ? $fields[$strTipoEmail.'subject-'.$lang] : '';
+
+    // BODY DEL MAIL
+    // SEGURIDAD: Sanitizar componentes de la clave
+    $tipoAsistenciaMail = sanitize_key($tipoAsistenciaMail);
+    $formaPagoMail = sanitize_key($formaPagoMail);
+    $claveBody = 'emailBody-'.$lang.'-'.$tipoDocumento.'-'.$tipoAsistenciaMail.'-'.$formaPagoMail;
+
+    $body = $wpdb->get_var( $wpdb->prepare(
+        "SELECT valor FROM evento_meta WHERE evento_id = %d AND clave = %s",
+        $event_id,
+        $claveBody
+    ));
+
+
+    // SEGURIDAD: Sanitizar code (ya viene codificado pero verificar)
+    $code = sanitize_text_field($code);
+
+    $link2 = '';
+    if(strcmp($formaPagoMail, 'Paypal') === 0){
+        $code_link2 = base64_encode(base64_encode(base64_encode($orden_id)));
+        $link2 = esc_url('https://asipi.org/asipi-helper/dlInvoiceEvento.php?&data=' . $code_link2);
+    }
+
+    // SEGURIDAD: Validar tipoDocumento antes de usar en URL
+    $link_factura = esc_url('https://asipi.org/asipi-helper/dl' . $tipoDocumento . 'Evento.php?&data=' . $code);
   /*$folder = $asipiPath.'wp-content/uploads/facturas/send/';    // $fields['pdf-folder'] .
   if ($carpeta!=''){
       $folder.=$carpeta;
@@ -1489,34 +1615,38 @@ function are_enviarfact($user_id, $orden_id, $tipoDocumento, $formaPagoMail, $ti
   $attachments = array($folder.$nombreArchivo);*/
   //var_dump($attachments);
 
-  /*Reemplazo %%SOCIO%% de la plantilla por el nombre y apellido */
-  $body = str_replace("%%SOCIO%%",$nombre,$body);
-  /*Reemplazo %%Fecha%% de la plantilla por el año actual */
-  $body = str_replace("%%FECHA%%",date("Y"),$body);
-  $subject = str_replace("%%FECHA%%",date("Y"),$subject);
-  $body = str_replace("%%EVENTO%%",$nombre_evento_largo,$body);
-  $subject = str_replace("%%EVENTO%%",$nombre_evento,$subject);
-  $body = str_replace("%%HEADER%%",$header_factura,$body);
-  $body = str_replace("%%LINK%%",$link_factura,$body);
-  $body = str_replace("%%TESORERO%%",$tesorero,$body);
-  //$headers = array('Content-Type: text/html; charset=UTF-8','Reply-To: tesoreria@asipi.org');
-  #$headers = 'From: no-reply@asipi.org'. "\r\n" . 'Content-Type: text/html; charset=UTF-8'. "\r\n" . 'Reply-To: tesoreria@asipi.org' . "\r\n" ;
-  #$headers = array('Content-Type: text/html; charset=UTF-8');
-  $headers = 'From: no-reply@asipi.org'. "\r\n" . 'Content-Type: text/html; charset=UTF-8'. "\r\n" . 'Reply-To: tesoreria@asipi.org' . "\r\n" ;
-  $body = str_replace("%%LINK2%%",$link2,$body);
-  /*Envío el correo en formato html con los attachments*/
-  //print_r($group_emails)
-  
-  $enviado = wp_mail($destinatario, $subject, $body, $headers);
-  #$enviado = wp_mail('wilder@ztgroupcorp.com', $subject, $body, $headers);
-  #$enviado = wp_mail('mpalenciap@gmail.com', $subject, $body, $headers);
-  #$enviado = wp_mail('elisa@ztgroupcorp.com', $subject, $body, $headers);
-  return $enviado;
+    // Reemplazos en plantilla (ya están sanitizados los valores)
+    $body = str_replace("%%SOCIO%%", esc_html($nombre), $body);
+    $body = str_replace("%%FECHA%%", date("Y"), $body);
+    $subject = str_replace("%%FECHA%%", date("Y"), $subject);
+    $body = str_replace("%%EVENTO%%", esc_html($nombre_evento_largo), $body);
+    $subject = str_replace("%%EVENTO%%", esc_html($nombre_evento), $subject);
+    $body = str_replace("%%HEADER%%", $header_factura, $body);
+    $body = str_replace("%%LINK%%", $link_factura, $body);
+    $body = str_replace("%%TESORERO%%", esc_html($tesorero), $body);
+    $body = str_replace("%%LINK2%%", $link2, $body);
+
+    $headers = 'From: no-reply@asipi.org' . "\r\n" .
+               'Content-Type: text/html; charset=UTF-8' . "\r\n" .
+               'Reply-To: tesoreria@asipi.org' . "\r\n";
+
+    // Enviar correo
+    $enviado = wp_mail($destinatario, $subject, $body, $headers);
+
+    return $enviado;
 }
 function are_notificacion($email, $alumno, $lang)
 {
-    //$folder2 = $asipiPath.'wp-content/uploads/facturas/'.$documentTitle;    // $fields['pdf-folder'] .
-    $attachments = '';//array($folder2);
+    // SEGURIDAD: Sanitizar y validar parámetros
+    $email = sanitize_email($email);
+    if (!is_email($email)) {
+        return false;
+    }
+
+    $alumno = sanitize_text_field($alumno);
+
+    // SEGURIDAD: Validar lang con whitelist
+    $lang = in_array($lang, array('es', 'en')) ? $lang : 'es';
 
     $formatoCorreo["subject-es"]= 'Confirmación Registro Seminario Virtual ASIPI 2021';
     $formatoCorreo["subject-en"]= 'Confirmación Registro Seminario Virtual ASIPI 2021';
@@ -1574,48 +1704,74 @@ function are_companion($orden_id)
 {
     global $wpdb;
     global $blog_id;
-    $user_id = $_REQUEST['id_usuario'];
-		//$userType = verify_email(false);
-		if ( $_REQUEST['llevarcompanion'] === "Sí" ) {
-      //$companion = explode(" ", $_REQUEST['nombrey']);
-      
-      // se agrega como participante a eventos de asipi
-      $sql = "INSERT INTO evento_acomp ( pwisa_users_ID, evento_id, nombre ) VALUES ( '".$user_id."' , '".$blog_id."' , '".$_REQUEST['nombrey']."' )";
-      $queryResult = $wpdb->get_results($sql);
 
-      $arrayColumnas = array(
-        'orden_id' => $orden_id,
-        'evento_id' => $blog_id,
-            'user_id' => $user_id,
-        'clave' => "tipo_acomp",
-        'valor' => 1
-      );				
-      $wpdb->insert(
-        'evento_info_adicional', 
-        $arrayColumnas
-      );
-				
-      return true;
-			
-		}else {
-      if($_REQUEST['conquien157']!=''){
-        $arrayColumnas = array(
-          'orden_id' => $orden_id,
-          'evento_id' => $blog_id,						
-              'user_id' => $user_id,
-          'clave' => "compartir_hab",
-          'valor' => ucwords(strtolower($_REQUEST['conquien157']))
-        );				
-        $wpdb->insert(
-          'evento_info_adicional', 
-          $arrayColumnas
-        );
-        return true;
-      }else{
-        return '0';
-      }
-			
-		}
+    // SEGURIDAD: Sanitizar IDs
+    $orden_id = absint($orden_id);
+    $user_id = isset($_REQUEST['id_usuario']) ? absint($_REQUEST['id_usuario']) : 0;
+    $blog_id = absint($blog_id);
+
+    if($user_id == 0){
+        return false;
+    }
+
+    // SEGURIDAD: Sanitizar llevarcompanion
+    $llevarcompanion = isset($_REQUEST['llevarcompanion']) ? sanitize_text_field($_REQUEST['llevarcompanion']) : '';
+
+    if ( $llevarcompanion === "Sí" ) {
+        // SEGURIDAD: Sanitizar nombre del acompañante
+        $nombrey = isset($_REQUEST['nombrey']) ? sanitize_text_field($_REQUEST['nombrey']) : '';
+
+        if($nombrey != ''){
+            // SEGURIDAD: Usar $wpdb->insert() con prepared statement
+            $wpdb->insert(
+                'evento_acomp',
+                array(
+                    'pwisa_users_ID' => $user_id,
+                    'evento_id' => $blog_id,
+                    'nombre' => $nombrey
+                ),
+                array('%d', '%d', '%s')
+            );
+
+            $arrayColumnas = array(
+                'orden_id' => $orden_id,
+                'evento_id' => $blog_id,
+                'user_id' => $user_id,
+                'clave' => "tipo_acomp",
+                'valor' => 1
+            );
+            $wpdb->insert(
+                'evento_info_adicional',
+                $arrayColumnas,
+                array('%d', '%d', '%d', '%s', '%d')
+            );
+
+            return true;
+        }
+        return false;
+
+    }else {
+        // SEGURIDAD: Sanitizar conquien157
+        $conquien157 = isset($_REQUEST['conquien157']) ? sanitize_text_field($_REQUEST['conquien157']) : '';
+
+        if($conquien157 != ''){
+            $arrayColumnas = array(
+                'orden_id' => $orden_id,
+                'evento_id' => $blog_id,
+                'user_id' => $user_id,
+                'clave' => "compartir_hab",
+                'valor' => ucwords(strtolower($conquien157))
+            );
+            $wpdb->insert(
+                'evento_info_adicional',
+                $arrayColumnas,
+                array('%d', '%d', '%d', '%s', '%s')
+            );
+            return true;
+        }else{
+            return false;
+        }
+    }
 }
 
 
