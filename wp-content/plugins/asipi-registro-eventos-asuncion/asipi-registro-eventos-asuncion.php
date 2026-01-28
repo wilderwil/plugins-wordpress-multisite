@@ -2,9 +2,14 @@
 /**
  * Plugin Name:       Asipi - Registro de Usuarios en Asunción 2025
  * Description:       Registro de usuarios a Asunción.
- * Version:           2.0.0
+ * Version:           2.0.1
  * Author:            ZT Group Corp Team
  */
+
+// Prevenir acceso directo
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 ## PASO 1 - Identificacion del usuario y formulario de jotform
 add_action('the_content', 'are_paso1_registro_eventos');
@@ -38,21 +43,33 @@ function are_invoice_registro_eventos( $output ){
 add_action('the_content', 'are_paso2_registro_eventos');
 function are_paso2_registro_eventos( $content ){
     if(is_page('registro-evento-recibo')){
-        //var_dump($_REQUEST);
-        if ( is_singular() /*&& in_the_loop()*/ && is_main_query() ) {
-           // var_dump($_REQUEST);
-            if (isset($_REQUEST['email'])) {
+        if ( is_singular() && is_main_query() ) {
+            // Sanitizar y validar email
+            if (isset($_REQUEST['email']) && !empty($_REQUEST['email'])) {
+                $email = sanitize_email($_REQUEST['email']);
+
+                // Validar que sea un email válido
+                if (is_email($email)) {
                     include('include/registro/registrar.php');
                     wp_enqueue_style( 'are_styles', '/wp-content/plugins/asipi-registro-eventos-asuncion/css/style_registro.css',false,'1.4','all');
                     include('paso2.php');
+                } else {
+                    return '<br><br><div class="alert alert-danger">Email inválido. Por favor, verifica tu dirección de email.</div>';
+                }
             }else{
-                $asipiPath = $_SERVER['DOCUMENT_ROOT'];
-                require ( $asipiPath . '/wp-load.php');
                 global $wpdb;
                 global $blog_id;
-                $event_url = $wpdb->get_var("SELECT valor FROM evento_meta WHERE clave = 'url' and evento_id = $blog_id");
 
-                return '<br><br><a href="'.$event_url.'registro-evento" class="btn btn-success">Volver</a>';
+                // Usar prepared statement para la consulta SQL
+                $event_url = $wpdb->get_var( $wpdb->prepare(
+                    "SELECT valor FROM evento_meta WHERE clave = %s AND evento_id = %d",
+                    'url',
+                    $blog_id
+                ));
+
+                // Escapar URL antes de output
+                $escaped_url = esc_url($event_url . 'registro-evento');
+                return '<br><br><a href="' . $escaped_url . '" class="btn btn-success">Volver</a>';
             }
         }
     }else{
@@ -170,36 +187,51 @@ require_once plugin_dir_path(__FILE__) . 'include/participantes/listado.php';
 
 add_filter( 'wp_nav_menu_items', 'add_extra_item_to_nav_menu', 10, 2 );
 function add_extra_item_to_nav_menu( $items, $args ) {
-#    $item = '<li style="padding-top:13px"><a href="/asuncion2025/registro-evento/?t=presencial">'.__("<!--:es-->Registro<!--:--><!--:en-->Register<!--:-->").'</a>';
     if (is_user_logged_in()) {
         global $wpdb;
 	      global $blog_id;
-        $event_id = $blog_id;
+        $event_id = absint($blog_id);
 
         $current_user = wp_get_current_user();
-        $user_id = $current_user->ID;
-        #$sql_user = "SELECT pwisa_users_ID FROM evento_orden WHERE pwisa_users_ID = '".$user_id."' and estado IN ('C','E','R') and evento_id = '$event_id'";
-        $sql_user = "SELECT pwisa_users_ID FROM evento_orden WHERE pwisa_users_ID = '".$user_id."' and visible = 1 and evento_id = '$event_id'";
-        $user_id_2 = $wpdb->get_var($sql_user);
+        $user_id = absint($current_user->ID);
+
+        // Usar prepared statement para verificar registro del usuario
+        $user_id_2 = $wpdb->get_var( $wpdb->prepare(
+            "SELECT pwisa_users_ID FROM evento_orden WHERE pwisa_users_ID = %d AND visible = 1 AND evento_id = %d",
+            $user_id,
+            $event_id
+        ));
+
         $admin = false;
         if ( current_user_can('manage_options') ) {
-        //el usuario actual es administrador
-        $admin = true;
+            //el usuario actual es administrador
+            $admin = true;
         }
-        $user_is_secretaria = $wpdb->get_var('SELECT COUNT(*) from pwisa_usermeta where meta_key = "pwisa_capabilities" AND (meta_value LIKE "%tesoreria%" or meta_value LIKE "%secretaria%")  AND user_id ='.$user_id);
-        if($user_is_secretaria>0){
+
+        // Usar prepared statement para verificar secretaria/tesorería
+        $user_is_secretaria = $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM pwisa_usermeta WHERE meta_key = %s AND (meta_value LIKE %s OR meta_value LIKE %s) AND user_id = %d",
+            'pwisa_capabilities',
+            '%tesoreria%',
+            '%secretaria%',
+            $user_id
+        ));
+
+        if($user_is_secretaria > 0){
              //el usuario actual es secretaria
             $admin = true;
         }
-      
-       if($user_id_2 > 0 || $admin){
-            $item3 = '<li ><a href="/asuncion2025/listado-de-participantes">'.__("<!--:es-->Participantes<!--:--><!--:en-->List of Participants<!--:-->").'</a></li>';
-           #$item2 = '<li><a href="/asuncion2025/registro-edicion">'.__("<!--:es-->Edición<!--:--><!--:en-->Edit<!--:-->").'</a>';
-    
-        }   
 
-        $sql_user = "SELECT pwisa_users_ID FROM evento_orden WHERE pwisa_users_ID = '".$user_id."' and subnumero=1 and visible=1 and estado IN ('C','P') and evento_id = '$event_id'";
-        $user_id_2 = $wpdb->get_var($sql_user);
+        if($user_id_2 > 0 || $admin){
+            $item3 = '<li><a href="' . esc_url('/asuncion2025/listado-de-participantes') . '">' . __("<!--:es-->Participantes<!--:--><!--:en-->List of Participants<!--:-->") . '</a></li>';
+        }
+
+        // Usar prepared statement para registro principal
+        $user_id_2 = $wpdb->get_var( $wpdb->prepare(
+            "SELECT pwisa_users_ID FROM evento_orden WHERE pwisa_users_ID = %d AND subnumero = 1 AND visible = 1 AND estado IN ('C','P') AND evento_id = %d",
+            $user_id,
+            $event_id
+        ));
         
         if($user_id_2 > 0){
           # $item2 = '<li style="padding-top:13px;padding-left: 20px;padding-right: 20px;"><a href="/asuncion2025/registro-edicion">'.__("<!--:es-->Editar registro<!--:--><!--:en-->Register edit<!--:-->").'</a>';
