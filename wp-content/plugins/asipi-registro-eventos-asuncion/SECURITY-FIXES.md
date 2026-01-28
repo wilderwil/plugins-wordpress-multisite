@@ -202,6 +202,251 @@ $item3 = '<li><a href="' . esc_url('/asuncion2025/listado-de-participantes') . '
 
 ---
 
+## 🔧 Fase 2: Correcciones en registrar.php (En Progreso)
+
+### Archivo: `include/registro/registrar.php`
+
+**Tamaño:** 1336 líneas (era 1281)
+**Correcciones aplicadas:** 20+
+**Estado:** Parcialmente corregido (10-15%)
+
+#### 1. Protección contra Acceso Directo ✅
+
+**Agregado (Línea 8-11):**
+```php
+// Prevenir acceso directo
+if (!defined('ABSPATH')) {
+    exit;
+}
+```
+
+#### 2. Sanitización de Inputs Críticos ✅
+
+**Antes (Línea 20-23):**
+```php
+$lang = ($_REQUEST['lang']) ? $_REQUEST['lang'] : 'es' ;
+$numero_orden = $_REQUEST['numero_orden'];
+$subnumero = $_REQUEST['subnumero'];
+```
+
+**Después:**
+```php
+// Sanitizar inputs críticos
+$lang = isset($_REQUEST['lang']) ? sanitize_text_field($_REQUEST['lang']) : 'es';
+// Validar que sea es o en
+$lang = in_array($lang, array('es', 'en')) ? $lang : 'es';
+
+$numero_orden = isset($_REQUEST['numero_orden']) ? absint($_REQUEST['numero_orden']) : 0;
+$subnumero = isset($_REQUEST['subnumero']) ? absint($_REQUEST['subnumero']) : 0;
+
+// Validar que numero_orden sea válido
+if ($numero_orden <= 0) {
+    wp_die('Número de orden inválido');
+}
+```
+
+**Beneficios:**
+- ✅ `sanitize_text_field()` para lang
+- ✅ Whitelist validation con `in_array()`
+- ✅ `absint()` para enteros
+- ✅ Validación de rango
+- ✅ Error handling apropiado
+
+#### 3. Prepared Statements en Consultas Críticas ✅
+
+**3.1. Obtener Número de Factura**
+
+**Antes (Línea 25):**
+```php
+$numero_factura= $wpdb->get_var("SELECT numero FROM evento_orden WHERE id = $numero_orden");
+```
+
+**Después:**
+```php
+$numero_factura = $wpdb->get_var( $wpdb->prepare(
+    "SELECT numero FROM evento_orden WHERE id = %d",
+    $numero_orden
+));
+```
+
+**3.2. Verificar Número Vigente**
+
+**Antes (Línea 27):**
+```php
+$numeroVigente1= $wpdb->get_var("SELECT count(*) FROM evento_orden WHERE subnumero = $subnumero and numero= $numero_factura and evento_id='".$blog_id."'");
+```
+
+**Después:**
+```php
+$numeroVigente1 = $wpdb->get_var( $wpdb->prepare(
+    "SELECT COUNT(*) FROM evento_orden WHERE subnumero = %d AND numero = %s AND evento_id = %d",
+    $subnumero,
+    $numero_factura,
+    $blog_id
+));
+```
+
+**3.3. Obtener Orden Original**
+
+**Antes (Línea 37):**
+```php
+$sql_orden = "SELECT * FROM `evento_orden` WHERE `id` = '$numero_orden'";
+$queryResult = $wpdb->get_results($sql_orden);
+```
+
+**Después:**
+```php
+$queryResult = $wpdb->get_results( $wpdb->prepare(
+    "SELECT * FROM `evento_orden` WHERE `id` = %d",
+    $numero_orden
+));
+
+if (empty($queryResult)) {
+    wp_die('Orden no encontrada');
+}
+```
+
+**Beneficios:**
+- ✅ 3 prepared statements implementados
+- ✅ Prevención de SQL Injection
+- ✅ Validación de resultados vacíos
+- ✅ Sintaxis SQL mejorada (COUNT vs count)
+
+#### 4. Sanitización de IDs de Actividades y Talleres ✅
+
+**Antes (Líneas 96-106):**
+```php
+$evento_social_1_id = ($_REQUEST['monto_actividad_1211']>0) ? $_REQUEST['id_actividad_1'] : '0' ;
+$evento_social_2_id = ($_REQUEST['monto_actividad_2210']>0) ? $_REQUEST['id_actividad_2'] : '0' ;
+// ... 10 variables más sin sanitizar
+```
+
+**Después:**
+```php
+$evento_social_1_id = (isset($_REQUEST['monto_actividad_1211']) && absint($_REQUEST['monto_actividad_1211']) > 0)
+    ? absint($_REQUEST['id_actividad_1']) : 0;
+
+$evento_social_2_id = (isset($_REQUEST['monto_actividad_2210']) && absint($_REQUEST['monto_actividad_2210']) > 0)
+    ? absint($_REQUEST['id_actividad_2']) : 0;
+
+// ... 10 variables sanitizadas con absint()
+```
+
+**Variables sanitizadas (12 total):**
+- `$evento_social_1_id` (Carrera Caminata)
+- `$evento_social_2_id` (Ruta Indicaciones Geográficas)
+- `$evento_social_3_id` (City Tour)
+- `$evento_social_4_id` (Come as You Are)
+- `$evento_social_5_id` (Yoga)
+- `$evento_actividad_id` (Deportiva)
+- `$evento_taller_id` (Taller 1)
+- `$evento_taller2_id` (Taller 2)
+- `$evento_social_7_id` (Especialidad Tradicional)
+- `$evento_social_8_id` (Desayuno Concurso)
+- `$evento_social_9_id` (Cata de vino)
+- `$total` (Total de pago)
+
+**Beneficios:**
+- ✅ 12 variables sanitizadas con `absint()`
+- ✅ Prevención de SQL Injection en INSERT posterior
+- ✅ Validación de `isset()` antes de acceder
+- ✅ Código más legible y mantenible
+- ✅ Valores default seguros (0 en lugar de '0' string)
+
+#### 5. Validación de Total de Pago ✅
+
+**Antes (Línea 88):**
+```php
+if ((int) $_REQUEST['total'] == 0) {
+    $status = 'C';
+    $visible = 0;
+}
+```
+
+**Después:**
+```php
+// Sanitizar total antes de usar
+$total = isset($_REQUEST['total']) ? absint($_REQUEST['total']) : 0;
+if ($total == 0) {
+    $status = 'C';
+    $visible = 0;
+}
+```
+
+**Beneficios:**
+- ✅ Sanitización con `absint()`
+- ✅ Validación de `isset()`
+- ✅ Variable reutilizable
+
+---
+
+### ⚠️ CRÍTICO - Pendiente de Corrección
+
+#### INSERT Masivo Sin Prepared Statement
+
+**Ubicación:** Líneas 107-150+
+
+**Problema CRÍTICO:**
+```php
+$sqlActivites = "INSERT INTO evento_orden (...) VALUES (
+    '".$ordenOriginal->pwisa_users_ID."',
+    '".$blog_id."',
+    '".$status."',
+    // ... 20+ columnas más concatenadas directamente
+)";
+$wpdb->query($sqlActivites);
+```
+
+**Riesgo:** SQL INJECTION CRÍTICO
+
+**Solución Requerida:**
+```php
+$wpdb->insert(
+    'evento_orden',
+    array(
+        'pwisa_users_ID' => $ordenOriginal->pwisa_users_ID,
+        'evento_id' => $blog_id,
+        'estado' => $status,
+        // ... todas las columnas
+    ),
+    array(
+        '%d', // pwisa_users_ID
+        '%d', // evento_id
+        '%s', // estado
+        // ... formats para todas las columnas
+    )
+);
+```
+
+**Esfuerzo estimado:** 2-3 horas
+**Prioridad:** CRÍTICA
+
+---
+
+### 📊 Estadísticas Fase 2
+
+| Métrica | Valor |
+|---------|-------|
+| **Inputs sanitizados** | 15+ |
+| **Prepared statements** | 3 |
+| **Validaciones agregadas** | 5 |
+| **Líneas modificadas** | ~80 |
+| **Líneas agregadas** | +55 |
+| **Tamaño archivo** | 1281 → 1336 líneas |
+| **Progreso estimado** | ~10-15% del archivo |
+
+### 📈 Mejoras Totales (Fase 1 + Fase 2 Parcial)
+
+| Métrica | Fase 1 | Fase 2 | Total |
+|---------|--------|--------|-------|
+| **Protecciones ABSPATH** | 1 | 1 | 2 |
+| **Inputs sanitizados** | 1 | 15 | 16 |
+| **Prepared statements** | 4 | 3 | 7 |
+| **Validaciones** | 2 | 5 | 7 |
+| **Escapado outputs** | 2 | 0 | 2 |
+
+---
+
 ## ⚠️ Pendientes de Corrección
 
 ### Prioridad Alta
@@ -321,7 +566,14 @@ if (!wp_verify_nonce($_POST['nonce'], 'action_name')) {
 - [x] Corregir consultas SQL críticas
 - [x] Escapar URLs principales
 
-### Fase 2 (Próximo)
+### Fase 2 (En Progreso) ⚙️
+- [x] Protección acceso directo en registrar.php
+- [x] Sanitizar numero_orden, subnumero, lang
+- [x] 3 prepared statements en consultas críticas
+- [x] Sanitizar 12 IDs de actividades y talleres
+- [x] Validación de total antes de usar
+- [ ] Refactorizar INSERT con prepared statement (CRÍTICO)
+- [ ] Sanitizar ~500+ inputs restantes
 - [ ] Corregir `include/registro/registrar.php`
 - [ ] Sanitizar todos los inputs del formulario
 - [ ] Agregar nonces a formularios

@@ -1,12 +1,17 @@
 <?php
+/**
+ * Procesamiento de registro de eventos
+ * ADVERTENCIA: Este archivo procesa datos sensibles - requiere validación estricta
+ */
+
+// Prevenir acceso directo
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 global $wpdb;
 global $blog_id;
-/*
-echo  '<pre>';
-var_dump($_REQUEST);
-echo '<pre>';
-die;*/
+
 //fecha de registro
 if(isset($_REQUEST['formID'])){
 
@@ -17,28 +22,54 @@ $dt->setTimestamp($timestamp);
 $fechahora = $dt->format('Y-m-d H:i:s');
 $day = $dt->format('Y-m-d');
 $isvalid=false;
-$lang = ($_REQUEST['lang']) ? $_REQUEST['lang'] : 'es' ;
-$numero_orden = $_REQUEST['numero_orden'];
 
-$subnumero = $_REQUEST['subnumero'];
+// Sanitizar inputs críticos
+$lang = isset($_REQUEST['lang']) ? sanitize_text_field($_REQUEST['lang']) : 'es';
+// Validar que sea es o en
+$lang = in_array($lang, array('es', 'en')) ? $lang : 'es';
 
-$numero_factura= $wpdb->get_var("SELECT numero FROM evento_orden WHERE id = $numero_orden");
+$numero_orden = isset($_REQUEST['numero_orden']) ? absint($_REQUEST['numero_orden']) : 0;
+$subnumero = isset($_REQUEST['subnumero']) ? absint($_REQUEST['subnumero']) : 0;
 
-$numeroVigente1= $wpdb->get_var("SELECT count(*) FROM evento_orden WHERE subnumero = $subnumero and numero= $numero_factura and evento_id='".$blog_id."'");
+// Validar que numero_orden sea válido
+if ($numero_orden <= 0) {
+    wp_die('Número de orden inválido');
+}
+
+// Usar prepared statements para consultas SQL
+$numero_factura = $wpdb->get_var( $wpdb->prepare(
+    "SELECT numero FROM evento_orden WHERE id = %d",
+    $numero_orden
+));
+
+$numeroVigente1 = $wpdb->get_var( $wpdb->prepare(
+    "SELECT COUNT(*) FROM evento_orden WHERE subnumero = %d AND numero = %s AND evento_id = %d",
+    $subnumero,
+    $numero_factura,
+    $blog_id
+));
 
 $numeroVigente = $subnumero;
 
 
 /*Edicion Formulario*/
-if($numero_orden!='' and $numeroVigente1==0){
-    
-    $isvalid =true;
+if($numero_orden > 0 && $numeroVigente1 == 0){
+
+    $isvalid = true;
     ///////////////////////////////////////////////////////////////////////////////////////////////
-    $sql_orden = "SELECT * FROM `evento_orden` WHERE `id` = '$numero_orden'";
-$queryResult = $wpdb->get_results($sql_orden);
-  foreach($queryResult as $row){
-    $ordenOriginal = $row;
-  }
+    // Usar prepared statement para obtener orden original
+    $queryResult = $wpdb->get_results( $wpdb->prepare(
+        "SELECT * FROM `evento_orden` WHERE `id` = %d",
+        $numero_orden
+    ));
+
+    if (empty($queryResult)) {
+        wp_die('Orden no encontrada');
+    }
+
+    foreach($queryResult as $row){
+        $ordenOriginal = $row;
+    }
 
   ## asigna el numero de factura a la orden del evento
     /*$sqlMaior = "SELECT MAX(subnumero) FROM evento_orden WHERE visible=1 and evento_id='".$blog_id."' AND numero='".$ordenOriginal->numero."'";
@@ -53,26 +84,50 @@ $queryResult = $wpdb->get_results($sql_orden);
   }else{
     $status = 'P';
   }
-  $visible=1;
-    if ((int)  $_REQUEST['total']  == 0) {
+  $visible = 1;
+
+  // Sanitizar total antes de usar
+  $total = isset($_REQUEST['total']) ? absint($_REQUEST['total']) : 0;
+  if ($total == 0) {
     $status = 'C';
     $visible = 0;
   }
 
-  // Crear orden del evento
+  // Crear orden del evento - Sanitizar todas las IDs de actividades
+  // Convertir a enteros para prevenir SQL injection
 
-    
-      $evento_social_1_id = ($_REQUEST['monto_actividad_1211']>0) ? $_REQUEST['id_actividad_1'] : '0' ; // Carrera Caminata 54
-      $evento_social_2_id = ($_REQUEST['monto_actividad_2210']>0) ? $_REQUEST['id_actividad_2'] : '0' ; // Ruta indicaciones Geograficas 56
-      $evento_social_3_id = ($_REQUEST['monto_actividad_3']>0) ? $_REQUEST['id_actividad_3'] : '0' ; // city Tour 52
-      $evento_social_4_id = ($_REQUEST['id_actividad_4']!='') ? $_REQUEST['id_actividad_4'] : '0' ; // Come as You are 55
-      $evento_social_5_id = ($_REQUEST['id_actividad_5']!='') ? $_REQUEST['id_actividad_5'] : '0' ; // yoga 53
-      $evento_actividad_id = ($_REQUEST['id_actividad_6']!='') ? $_REQUEST['id_actividad_6'] : '0' ; //Deportiva Verificar el concepto de la actividad
-      $evento_taller_id = ($_REQUEST['id_taller_1']!='') ? $_REQUEST['id_taller_1'] : '0' ;
-      $evento_taller2_id = ($_REQUEST['id_taller_2']!='') ? $_REQUEST['id_taller_2'] : '0' ;
-      $evento_social_7_id = ($_REQUEST['id_actividad_7']!='') ? $_REQUEST['id_actividad_7'] : '0' ; // ¡Buen provecho! Hoy almorzamos una Especialidad Tradicional Garantizada 61
-      $evento_social_8_id = ($_REQUEST['id_actividad_8']!='') ? $_REQUEST['id_actividad_8'] : '0' ; // Desayuno Concurso Innovación Verde 75   	
-      $evento_social_9_id = ($_REQUEST['id_actividad_9']!='') ? $_REQUEST['id_actividad_9'] : '0' ; // Cata de vino y maridaje
+  $evento_social_1_id = (isset($_REQUEST['monto_actividad_1211']) && absint($_REQUEST['monto_actividad_1211']) > 0)
+      ? absint($_REQUEST['id_actividad_1']) : 0; // Carrera Caminata 54
+
+  $evento_social_2_id = (isset($_REQUEST['monto_actividad_2210']) && absint($_REQUEST['monto_actividad_2210']) > 0)
+      ? absint($_REQUEST['id_actividad_2']) : 0; // Ruta indicaciones Geograficas 56
+
+  $evento_social_3_id = (isset($_REQUEST['monto_actividad_3']) && absint($_REQUEST['monto_actividad_3']) > 0)
+      ? absint($_REQUEST['id_actividad_3']) : 0; // city Tour 52
+
+  $evento_social_4_id = (isset($_REQUEST['id_actividad_4']) && $_REQUEST['id_actividad_4'] != '')
+      ? absint($_REQUEST['id_actividad_4']) : 0; // Come as You are 55
+
+  $evento_social_5_id = (isset($_REQUEST['id_actividad_5']) && $_REQUEST['id_actividad_5'] != '')
+      ? absint($_REQUEST['id_actividad_5']) : 0; // yoga 53
+
+  $evento_actividad_id = (isset($_REQUEST['id_actividad_6']) && $_REQUEST['id_actividad_6'] != '')
+      ? absint($_REQUEST['id_actividad_6']) : 0; //Deportiva
+
+  $evento_taller_id = (isset($_REQUEST['id_taller_1']) && $_REQUEST['id_taller_1'] != '')
+      ? absint($_REQUEST['id_taller_1']) : 0;
+
+  $evento_taller2_id = (isset($_REQUEST['id_taller_2']) && $_REQUEST['id_taller_2'] != '')
+      ? absint($_REQUEST['id_taller_2']) : 0;
+
+  $evento_social_7_id = (isset($_REQUEST['id_actividad_7']) && $_REQUEST['id_actividad_7'] != '')
+      ? absint($_REQUEST['id_actividad_7']) : 0; // Especialidad Tradicional Garantizada 61
+
+  $evento_social_8_id = (isset($_REQUEST['id_actividad_8']) && $_REQUEST['id_actividad_8'] != '')
+      ? absint($_REQUEST['id_actividad_8']) : 0; // Desayuno Concurso Innovación Verde 75
+
+  $evento_social_9_id = (isset($_REQUEST['id_actividad_9']) && $_REQUEST['id_actividad_9'] != '')
+      ? absint($_REQUEST['id_actividad_9']) : 0; // Cata de vino y maridaje
     	$sqlActivites = "INSERT INTO evento_orden 
                 (pwisa_users_ID, 
                 evento_id, 
