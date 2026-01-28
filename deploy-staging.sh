@@ -78,10 +78,11 @@ for plugin in $CUSTOM_PLUGINS; do
     if [ -d "wp-content/plugins/$plugin" ]; then
         echo -e "${BLUE}Deploying plugin: $plugin${NC}"
 
-        rsync $RSYNC_OPTIONS \
-            -e "ssh -p $STAGING_PORT" \
-            "wp-content/plugins/$plugin/" \
-            "$STAGING_USER@$STAGING_HOST:$STAGING_PATH/$plugin/"
+        # Crear directorio en servidor si no existe
+        ssh -p $STAGING_PORT $STAGING_USER@$STAGING_HOST "mkdir -p $STAGING_PATH/$plugin"
+
+        # Copiar archivos usando scp (alternativa a rsync para Windows)
+        scp -r -P $STAGING_PORT "wp-content/plugins/$plugin/"* "$STAGING_USER@$STAGING_HOST:$STAGING_PATH/$plugin/"
 
         echo -e "${GREEN}✓ $plugin deployed${NC}\n"
     else
