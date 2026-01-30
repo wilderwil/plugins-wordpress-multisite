@@ -1,0 +1,314 @@
+<?php
+$asipiPath = $_SERVER['DOCUMENT_ROOT'];
+
+require($asipiPath . '/wp-load.php');
+
+global $wpdb;
+
+global $blog_id;
+
+if (is_user_logged_in()) {
+    //wp_logout();
+}
+/*$creds = array();
+			$creds['user_login'] = 'sociocarlos';
+			$creds['user_password'] = '123456';
+			$creds['remember'] = false;*/
+//wp_logout();
+//$user = wp_authenticate( $creds['user_login'], $creds['user_password'] ); 
+//$user = wp_signon( $creds, true );
+//exit();
+
+//$lang = ($_REQUEST['lang']) ? $_REQUEST['lang'] : 'es' ;
+$lang = qtranxf_getLanguage();
+/*if(isset($_REQUEST['curso'])){
+    $idcurso = $_REQUEST['curso'];
+}*/
+//$sql = "SELECT DISTINCT value FROM pwisa_bp_xprofile_data WHERE field_id=12 ORDER BY value asc";
+
+$sql = "SELECT DISTINCT t2.value FROM pwisa_bp_xprofile_data t2 
+
+INNER JOIN pwisa_usermeta t1 ON t1.user_id = t2.user_id
+
+where t1.meta_key = 'pwisa_capabilities' AND t1.meta_value LIKE '%member%'
+
+and t2.field_id=12 ORDER BY value asc";
+$queryResult = $wpdb->get_results($sql);
+$queryResult = json_decode(json_encode($queryResult), true);
+$costo_socio = 375;
+$costo_miembro = 375;
+$costo_nosocio = 375;
+$costo_student = 375;
+$nombre_evento['es'] = '';
+$nombre_evento['en'] = '';
+$socios_exentos = '';
+# Datos del evento
+
+//$sql = "SELECT id, nombre, costo_socio, costo_miembro, costo_nosocio, cant_modulos, cupos FROM pwisa_asipi_cursos WHERE id=$idcurso limit 1";
+$sql = "SELECT * FROM evento_meta where evento_id = '$blog_id'";
+$qryEvento = $wpdb->get_results($sql);
+$qryEvento = json_decode(json_encode($qryEvento), true);
+$costos = array();
+
+function periodo()
+{
+    global $wpdb;
+    global $blog_id;
+    $today = date("Y-m-d");
+    $earlyBird = $wpdb->get_var('SELECT valor FROM evento_meta WHERE clave = "early_bird" AND evento_id =' . $blog_id);
+    $insitu = $wpdb->get_var('SELECT valor FROM evento_meta WHERE clave = "in_situ" AND evento_id =' . $blog_id);
+
+    $tipoCost = 'full';
+    if ($today <= $earlyBird) {
+        $tipoCost = 'early_bird';
+    } else if ($today > $earlyBird && $today < $insitu) {
+        $tipoCost = 'full';
+    } else {
+        $tipoCost = 'in_situ';
+    }
+    return $tipoCost;
+}
+
+$tipo_precio = periodo();
+
+foreach ($qryEvento as $key => $value) {
+
+    $posicion_coincidencia = strpos($value['clave'], '_price');
+
+    //se puede hacer la comparacion con 'false' o 'true' y los comparadores '===' o '!=='
+    if ($posicion_coincidencia !== false) {
+        $costos[$value['clave']] = $value['valor'];
+    }
+
+    if ($value['clave'] == 'socios_exentos') {
+        $socios_exentos = $value['valor'];
+    }
+
+
+    switch ($value['clave']) {
+        case "member_full_price":
+            $costo_socio = $value['valor'];
+            break;
+        case "member_of_firm_full_price":
+            $costo_miembro = $value['valor'];
+            break;
+        case "non_member_full_price":
+            $costo_nosocio = $value['valor'];
+            break;
+        case "student_full_price":
+            $costo_student = $value['valor'];
+            break;
+        case "name_es":
+            $nombre_evento['es'] = $value['valor'];
+            break;
+        case "name_en":
+            $nombre_evento['en'] = $value['valor'];
+            break;
+        case "description_es":
+            $descripcion_evento['es'] = $value['valor'];
+            break;
+        case "description_en":
+            $descripcion_evento['en'] = $value['valor'];
+            break;
+        case "registro_member":
+            $registro_member = $value['valor'];
+            break;
+        case "registro_member_of_firm":
+            $registro_member_of_firm = $value['valor'];
+            break;
+        case "registro_nosocio":
+            $registro_nosocio = $value['valor'];
+            break;
+        case "registro_student":
+            $registro_student = $value['valor'];
+            break;
+        case "registro_virtual":
+            $registro_virtual = $value['valor'];
+            break;
+        case "registro_guest":
+            $registro_guest = $value['valor'];
+            break;
+    }
+}
+$textos = array(
+    'es' => array(
+        'course' => 'Curso',
+        'registry' => 'Registro',
+        'free' => 'Sin Costo',
+        //'register_with_email_asipi' => 'Debe ingresar con su correo registrado en ASIPI<br><spam style="font-size:10px">Estar al día con la membresía</spam>', 
+        'register_with_email_asipi' => 'Todos los socios serán registrados sin costo.<br><spam style="font-size:10px">Recibirán un correo de confirmación con las credenciales de acceso. En caso de no recibirlo antes del evento comunicarse con tesoreria@asipi.org</spam>',
+        'register' => 'Registrarse',
+        'members_firm_tit' => 'Miembros de Firma<br>con Socios en ASIPI',
+        'members_firm_tit_form' => 'Miembros de Firma<br>con Socios en ASIPI',
+        'members_firm_nota' => 'Debe ingresar el correo registrado en ASIPI del Socio',
+        //'student_nota' => 'menores de 25 años gratis<br><spam style="font-size:10px">deben cargar pasaporte e identificación de estudiante</spam>',
+        'student_nota' => '<spam style="font-size:12px">Deben cargar pasaporte e identificación de estudiante</spam>',
+        'non_member' => 'No Socios',
+        'student' => 'Estudiantes',
+        'member' => 'Socios',
+        'enter_email_asipi' => 'Ingrese su correo registrado en ASIPI',
+        'password' => 'Contraseña',
+        'enter_password' => 'Ingrese la contraseña',
+        'forgot_password' => 'Olvidó Contraseña',
+        'new_password' => 'Nueva Contraseña',
+        'repeat_password' => 'Repite la Contraseña',
+        'continue' => 'Continuar',
+        'please_enter_email' => 'Por favor ingrese su correo electrónico',
+        'enter_email' => 'Ingrese su correo electrónico',
+        'please_enter_email_asipi_nota' => 'Por favor ingresar el correo electrónico del socio de ASIPI miembro en su firma',
+        'please_enter_email_asipi' => 'Ingresar correo del socio de ASIPI',
+        'company' => 'Compañia',
+        'select_company' => 'Seleccione Compañia',
+        'policies_title' => 'Políticas de cancelación:',
+        'policies_text' => 'Hasta el 16 de Agosto, devolución del 50%, luego de esa fecha, no habrá devoluciones.',
+        'new_user' => 'Nuevo usuario - Rellene los siguientes datos',
+        'guest' => 'Invitados Especiales',
+        'guest_nota' => '<spam style="font-size:12px">Lorem Ipsum</spam>',
+        'coupon' =>'Cupón especial',
+        'enter_coupon'=> 'Ingrese el código del cupón'
+
+    ),
+    'en' => array(
+        'course' => 'Course',
+        'registry' => 'Registry',
+        'free' => 'Free',
+        //'register_with_email_asipi' => 'Use your email registered in ASIPI',
+        'register_with_email_asipi' => 'All members will be register free of charge.<br><spam style="font-size:10px">If you did not receive an email confirmation, please contact tesoreria@asipi.org</spam>',
+        'register' => 'Register',
+        'members_firm_tit' => 'Non-members with<br>partners in ASIPI',
+        'members_firm_tit_form' => 'Non-members with partners in ASIPI',
+        'members_firm_nota' => 'You need the partner´s email registered in ASIPI',
+        //'student_nota' => 'Students under 25 free<br><spam style="font-size:10px">You must upload passport and student id</spam>',
+        'student_nota' => '<spam style="font-size:12px">You must upload passport and student id</spam>',
+        'non_member' => 'Non Members',
+        'student' => 'Student',
+        'member' => 'Members',
+        'enter_email_asipi' => 'Enter your email registered in ASIPI',
+        'password' => 'Password',
+        'enter_password' => 'Enter password',
+        'forgot_password' => 'Forgot Password',
+        'new_password' => 'New Password',
+        'repeat_password' => 'Repeat Password',
+        'continue' => 'next',
+        'please_enter_email' => 'Please enter your email',
+        'enter_email' => 'Enter your email',
+        'please_enter_email_asipi_nota' => 'Please enter a valid email address (ASIPI Members use your email registered with us)',
+        'please_enter_email_asipi' => 'Enter email from ASIPI partner',
+        'company' => 'Company',
+        'select_company' => 'Select Company',
+        'policies_title' => 'Cancellation policies:',
+        'policies_text' => 'Until Ago 16, refund of 50%, after that date, there will be no refunds.',
+        'new_user' => 'New user - Fill in the following information',
+        'guest' => 'Special Guests',
+        'guest_nota' => '<spam style="font-size:12px">Lorem Ipsum</spam>',
+        'coupon' =>'Special coupon',
+        'enter_coupon'=> 'Enter coupon code'
+    ),
+);
+?>
+<script>
+<?php if ($_SERVER['SERVER_NAME'] == 'staging.asipi.org') { ?>
+var id_jotform = '230433112447647';
+<?php } else { ?>
+var id_jotform = '222293343651352';
+<?php } ?>
+var id_curso = '<?php echo $idcurso ?>';
+var tipo_curso = '<?php echo $tipo_curso ?>';
+var nombre_curso = '<?php echo $nombre_curso ?>';
+const socios_exentos = [<?php echo $socios_exentos ?>];
+//console.log(socios_exentos);
+
+var precios = new Object();
+precios.socio = '<?php echo $costo_socio ?>';
+precios.miembro = '<?php echo $costo_miembro ?>';
+precios.nosocio = '<?php echo $costo_nosocio ?>';
+precios.student = '<?php echo $costo_student ?>';
+
+var costos = new Object();
+costos.companion = new Object();
+costos.socio = new Object();
+costos.nosocio = new Object();
+costos.student = new Object();
+costos.invitado = new Object();
+costos.guest = new Object();
+
+costos.socio.virtual = '<?php echo $costos['member_virtual_full_price'] ?>';
+costos.nosocio.virtual = '<?php echo $costos['non_member_virtual_full_price'] ?>';
+costos.student.virtual = '<?php echo $costos['student_virtual_full_price'] ?>';
+
+costos.socio.simple = '<?php echo $costos['member_simple_' . $tipo_precio . '_price'] ?>';
+costos.socio.doble = '<?php echo $costos['member_doble_' . $tipo_precio . '_price'] ?>';
+costos.socio.triple = '<?php echo $costos['member_triple_' . $tipo_precio . '_price'] ?>';
+
+costos.nosocio.simple = '<?php echo $costos['non_member_simple_' . $tipo_precio . '_price'] ?>';
+costos.nosocio.doble = '<?php echo $costos['non_member_doble_' . $tipo_precio . '_price'] ?>';
+costos.nosocio.triple = '<?php echo $costos['non_member_triple_' . $tipo_precio . '_price'] ?>';
+
+costos.student.simple = '<?php echo $costos['student_simple_' . $tipo_precio . '_price'] ?>';
+costos.invitado.simple = '<?php echo $costos['invitado_simple_' . $tipo_precio . '_price'] ?>';
+
+costos.companion.doble = '<?php echo $costos['companion_doble_' . $tipo_precio . '_price'] ?>';
+costos.companion.triple = '<?php echo $costos['companion_triple_' . $tipo_precio . '_price'] ?>';
+
+costos.guest.simple = '<?php echo $costos['guest_simple_' . $tipo_precio . '_price'] ?>';
+</script>
+
+<?php
+
+
+if ($registro_virtual == 'si') {
+    if (isset($_GET['t'])) {
+        if ($_GET['t'] == 'virtual') {
+            require('registro/paso1-virtual.php');
+        } else {
+            require('paso1-presencial.php');
+        }
+    } else {
+        require('registro/paso1-btn.php');
+    }
+} else {
+    require('paso1-invitados.php');
+}
+
+
+?>
+
+<style>
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: "Raleway";
+}
+
+.divform {
+    display: none;
+}
+
+.cont_list {
+    margin: 17px;
+}
+
+.formFooter {
+    display: none;
+}
+
+.cambiar_plan {
+    display: none;
+    text-decoration: none;
+    cursor: pointer;
+    color: #007bff !important;
+}
+
+#bloque-titulo h3 {
+    font-size: 36px;
+    margin-bottom: 0px;
+    font-weight: 800;
+    text-transform: uppercase;
+    line-height: 1;
+    letter-spacing: 4px;
+    padding: 30px;
+}
+</style>
