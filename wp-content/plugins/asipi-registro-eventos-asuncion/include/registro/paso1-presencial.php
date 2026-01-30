@@ -1400,7 +1400,7 @@ $today = date("Y-m-d");
          }
          </style>
          <?php require_once plugin_dir_path(__FILE__) . 'jotform.php'; ?>
-         <?php echo do_shortcode( '[are_planesasuncion2025]' ); ?>
+         <?php echo do_shortcode( '[are_planesasuncion2026]' ); ?>
          <?php /* ?>
          <div class="container">
              <div class="twelve columns" style="text-align: justify;">

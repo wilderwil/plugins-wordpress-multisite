@@ -346,7 +346,7 @@ $textos = array(
 </div>
 
 <iframe id="JotFormIFrame-222413772555658"
-    title="Seminario EL Salvador 2025" onload="window.parent.scrollTo(0,0)"
+    title="Seminario EL Salvador 2026" onload="window.parent.scrollTo(0,0)"
     allowtransparency="true" allowfullscreen="true" allow="geolocation; microphone; camera"
     src="https://form.jotform.com/222413772555658" frameborder="0" style="
       min-width: 100%;

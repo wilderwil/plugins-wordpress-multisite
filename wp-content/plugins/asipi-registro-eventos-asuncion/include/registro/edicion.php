@@ -317,7 +317,7 @@ switch ($user_type) {
             class="btnlogincont"><?php echo  __('[:es]Para editar su registro, primero debe completar la inscripción al evento[:en]To edit your registration, you must first complete the event registration[:]'); ?></span>
         <br><br>
         <a class="btn btn_certificado"
-            href="/asuncion2025/registro-evento/?t=presencial"><?php echo  __('[:es]Regístrate aquí[:en]Register Here[:]'); ?></a>
+            href="/asuncion2026/registro-evento/?t=presencial"><?php echo  __('[:es]Regístrate aquí[:en]Register Here[:]'); ?></a>
     </div>
     <br><br><br>
 </div>
@@ -335,7 +335,7 @@ switch ($user_type) {
         <br><br>
         <span class="btnlogincont" id="loginlik"><?php echo  __('[:es]Iniciar Sesión[:en]Login[:]'); ?></span>
         <br><br>
-        <a class="btn btn_certificado" href="/asuncion2025/">Ir a Inicio</a>
+        <a class="btn btn_certificado" href="/asuncion2026/">Ir a Inicio</a>
     </div>
     <br><br><br>
 </div>

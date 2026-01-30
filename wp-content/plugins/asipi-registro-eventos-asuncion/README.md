@@ -1,6 +1,6 @@
-# Asipi - Registro de Usuarios en Asunción 2025
+# Asipi - Registro de Usuarios en Asunción 2026
 
-Plugin de WordPress para gestionar el registro de usuarios al evento ASIPI en Asunción 2025.
+Plugin de WordPress para gestionar el registro de usuarios al evento ASIPI en Asunción 2026.
 
 ## Descripción
 
@@ -15,7 +15,7 @@ Sistema completo de registro de participantes para eventos ASIPI que incluye:
 
 ## Versión
 
-**2.0.0** - Adaptado para Asunción 2025
+**2.0.0** - Adaptado para Asunción 2026
 
 ## Características
 
@@ -36,7 +36,7 @@ Sistema completo de registro de participantes para eventos ASIPI que incluye:
 ### Funcionalidades
 
 - `[are_invitadosEspeciales]` - Formulario para invitados especiales
-- `[are_planebasasuncion2025]` - Planes y costos del evento
+- `[are_planebasasuncion2026]` - Planes y costos del evento
 - `[are_edicion]` - Edición de registro
 - `[are_confirmacionEdicion]` - Confirmación de edición
 - `[arc_config_eventos]` - Panel de configuración y lista de registrados
@@ -65,7 +65,7 @@ asipi-registro-eventos-asuncion/
 │   ├── registro/                         # Sistema de registro
 │   │   ├── edicion.php
 │   │   ├── invitados.php
-│   │   ├── planesasuncion2025.php
+│   │   ├── planesasuncion2026.php
 │   │   └── registrar.php
 │   ├── login/                            # Sistema de login
 │   │   ├── socio.php
@@ -86,10 +86,10 @@ asipi-registro-eventos-asuncion/
 
 ## Páginas Requeridas
 
-- `/asuncion2025/registro-evento` - Página principal de registro
-- `/asuncion2025/registro-evento-recibo` - Confirmación y recibo
-- `/asuncion2025/listado-de-participantes` - Lista de participantes
-- `/asuncion2025/registro-edicion` - Edición de registro
+- `/asuncion2026/registro-evento` - Página principal de registro
+- `/asuncion2026/registro-evento-recibo` - Confirmación y recibo
+- `/asuncion2026/listado-de-participantes` - Lista de participantes
+- `/asuncion2026/registro-edicion` - Edición de registro
 
 ## Uso de Shortcodes
 
@@ -98,7 +98,7 @@ asipi-registro-eventos-asuncion/
 [are_invitadosEspeciales]
 
 // Planes del evento
-[are_planesasuncion2025]
+[are_planesasuncion2026]
 
 // Edición de registro
 [are_edicion]
@@ -156,21 +156,21 @@ El plugin lee configuraciones desde la tabla `evento_meta`:
 
 ## Desarrollo
 
-Este plugin fue desarrollado para ASIPI y adaptado para el evento de Asunción 2025.
+Este plugin fue desarrollado para ASIPI y adaptado para el evento de Asunción 2026.
 
 ### Origen
 
-Basado en el plugin original de Buenos Aires 2025, adaptado con los siguientes cambios:
+Basado en el plugin original de Buenos Aires 2026, adaptado con los siguientes cambios:
 
 - Renombrado de archivos y carpetas
-- Actualización de URLs (/asuncion2025/)
+- Actualización de URLs (/asuncion2026/)
 - Cambio de referencias de "Buenos Aires" a "Asunción"
-- Ajuste de funciones (planesasuncion2025)
+- Ajuste de funciones (planesasuncion2026)
 
 ### Changelog
 
 **v2.0.0 - 2026-01-28**
-- Adaptación completa para Asunción 2025
+- Adaptación completa para Asunción 2026
 - Renombrado de plugin y archivos
 - Actualización de URLs y referencias
 - Documentación completa

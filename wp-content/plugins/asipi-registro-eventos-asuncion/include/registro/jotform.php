@@ -19,7 +19,7 @@
 */
 
 ?>
-<iframe id="JotFormIFrame-252154118618152" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation" title="Seminario ASIPI Asunción 2025" allowtransparency=" true"
+<iframe id="JotFormIFrame-252154118618152" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation" title="Seminario ASIPI Asunción 2026" allowtransparency=" true"
     allowfullscreen="true" allow="geolocation; microphone; camera" src="https://form.jotform.com/252154118618152"
     frameborder="0" style="
 
@@ -209,7 +209,7 @@ if (window.addEventListener) {
 
 <?php }else{ ?>
 
-<iframe id="JotFormIFrame-252023962027148" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation" title="Congreso ASIPI Asunción 2025" "
+<iframe id="JotFormIFrame-252023962027148" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation" title="Congreso ASIPI Asunción 2026" "
     allowtransparency=" true" allowfullscreen="true" allow="geolocation; microphone; camera"
     src="https://form.jotform.com/252023962027148" frameborder="0" style="
       min-width: 100%;

@@ -1,4 +1,4 @@
-# Análisis Completo: Plugin ASIPI Registro Eventos Asunción 2025
+# Análisis Completo: Plugin ASIPI Registro Eventos Asunción 2026
 
 **Fecha de análisis:** 2026-01-28
 **Versión del plugin:** 2.0.0
@@ -8,7 +8,7 @@
 
 ## 📊 Resumen Ejecutivo
 
-Plugin de WordPress diseñado para gestionar el registro de participantes al evento ASIPI en Asunción 2025. Sistema completo con módulos de registro, pagos, tesorería y gestión de participantes.
+Plugin de WordPress diseñado para gestionar el registro de participantes al evento ASIPI en Asunción 2026. Sistema completo con módulos de registro, pagos, tesorería y gestión de participantes.
 
 ### Métricas Generales
 
@@ -89,7 +89,7 @@ asipi-registro-eventos-asuncion/
 │   │   ├── paso1-virtual.php             (596 líneas)
 │   │   ├── planes.php                    (614 líneas) - Planes generales
 │   │   ├── planes_inc.php                (388 líneas) - Planes incluidos
-│   │   ├── planesasuncion2025.php        (602 líneas) - Planes Asunción 2025
+│   │   ├── planesasuncion2026.php        (602 líneas) - Planes Asunción 2026
 │   │   ├── planespanama2024-original.php (351 líneas) - Referencia Panamá
 │   │   ├── registrar.php                 (1281 líneas) - Procesamiento de registro
 │   │   ├── registrarEdicion.php          (602 líneas)
@@ -167,7 +167,7 @@ asipi-registro-eventos-asuncion/
 | `[are_edicion]` | `are_registroEdicion()` | Editar registro | ✅ Activo |
 | `[are_confirmacionEdicion]` | `are_confirmacionEdicion()` | Confirmación edición | ✅ Activo |
 | `[are_planes]` | `are_planescostos()` | Planes generales | Comentado |
-| `[are_planesasuncion2025]` | `are_planescostosasuncion2025()` | Planes Asunción 2025 | ✅ Activo |
+| `[are_planesasuncion2026]` | `are_planescostosasuncion2026()` | Planes Asunción 2026 | ✅ Activo |
 | `[arc_config_eventos]` | `arc_lista_registrados()` | Panel administración | ✅ Activo |
 
 **Shortcodes activos:** 5 de 11
@@ -195,7 +195,7 @@ asipi-registro-eventos-asuncion/
 #### Paso 3: Planes y Costos
 - **Archivo:** `paso3.php` (79 líneas)
 - **Función:** Mostrar planes disponibles
-- **Shortcode:** `[are_planesasuncion2025]`
+- **Shortcode:** `[are_planesasuncion2026]`
 
 #### Paso 4: Finalización
 - **Archivo:** `paso4.php` (91 líneas)
@@ -336,7 +336,7 @@ Módulo ubicado en: `include/participantes/`
 - Formulario de contacto entre participantes
 - Exportación de lista
 
-**URL:** `/asuncion2025/listado-de-participantes`
+**URL:** `/asuncion2026/listado-de-participantes`
 
 **Condiciones de acceso:**
 ```php
@@ -412,7 +412,7 @@ AND evento_id = $event_id
 - `evento_id` - ID del evento
 
 **Metadatos comunes:**
-- `url` - URL base del evento (/asuncion2025/)
+- `url` - URL base del evento (/asuncion2026/)
 - `name_es` - Nombre en español
 - `name_en` - Nombre en inglés
 
@@ -623,21 +623,21 @@ wp_register_script('are_miscript', $my_plugin, array('jquery'), rand(0, 99), tru
 
 | Slug | URL | Propósito |
 |------|-----|-----------|
-| `registro-evento` | `/asuncion2025/registro-evento` | Página principal de registro |
-| `registro-evento-recibo` | `/asuncion2025/registro-evento-recibo` | Confirmación y recibo |
-| `listado-de-participantes` | `/asuncion2025/listado-de-participantes` | Lista de participantes |
-| `registro-edicion` | `/asuncion2025/registro-edicion` | Editar registro existente |
+| `registro-evento` | `/asuncion2026/registro-evento` | Página principal de registro |
+| `registro-evento-recibo` | `/asuncion2026/registro-evento-recibo` | Confirmación y recibo |
+| `listado-de-participantes` | `/asuncion2026/listado-de-participantes` | Lista de participantes |
+| `registro-edicion` | `/asuncion2026/registro-edicion` | Editar registro existente |
 
 ### Endpoints Especiales
 
 **Certificados:**
 ```
-/asuncion2025/registro-evento-recibo?certificado=1
+/asuncion2026/registro-evento-recibo?certificado=1
 ```
 
 **Facturas:**
 ```
-/asuncion2025/registro-evento-recibo?numero=123&tipo=1
+/asuncion2026/registro-evento-recibo?numero=123&tipo=1
 ```
 
 ---
@@ -707,7 +707,7 @@ wp_enqueue_style('are_styles',
 
 ```
 1. INICIO
-   ├─ Usuario accede a /asuncion2025/registro-evento
+   ├─ Usuario accede a /asuncion2026/registro-evento
    ├─ Plugin detecta: is_page('registro-evento')
    └─ Ejecuta: are_paso1_registro_eventos()
 
@@ -721,7 +721,7 @@ wp_enqueue_style('are_styles',
 
 3. USUARIO COMPLETA FORMULARIO
    ├─ Submit del formulario
-   ├─ POST a /asuncion2025/registro-evento-recibo
+   ├─ POST a /asuncion2026/registro-evento-recibo
    └─ Datos en $_REQUEST
 
 4. PASO 2: Procesamiento
@@ -735,7 +735,7 @@ wp_enqueue_style('are_styles',
    └─ Muestra: paso2.php (confirmación)
 
 5. PASO 3: Planes y Costos (Opcional)
-   ├─ Shortcode: [are_planesasuncion2025]
+   ├─ Shortcode: [are_planesasuncion2026]
    ├─ Muestra planes disponibles
    ├─ Usuario selecciona plan
    └─ Actualiza orden con concepto
@@ -747,7 +747,7 @@ wp_enqueue_style('are_styles',
    └─ Mensaje de confirmación
 
 7. POST-REGISTRO
-   ├─ Usuario puede editar: /asuncion2025/registro-edicion
+   ├─ Usuario puede editar: /asuncion2026/registro-edicion
    ├─ Usuario puede ver participantes
    ├─ Admin puede gestionar desde panel
    └─ Tesorería puede validar pagos
@@ -808,15 +808,15 @@ wp_enqueue_style('are_styles',
 ```sql
 -- URL base del evento
 INSERT INTO evento_meta (clave, valor, evento_id)
-VALUES ('url', '/asuncion2025/', 35);
+VALUES ('url', '/asuncion2026/', 35);
 
 -- Nombre del evento (español)
 INSERT INTO evento_meta (clave, valor, evento_id)
-VALUES ('name_es', 'Congreso ASIPI Asunción 2025', 35);
+VALUES ('name_es', 'Congreso ASIPI Asunción 2026', 35);
 
 -- Nombre del evento (inglés)
 INSERT INTO evento_meta (clave, valor, evento_id)
-VALUES ('name_en', 'ASIPI Congress Asunción 2025', 35);
+VALUES ('name_en', 'ASIPI Congress Asunción 2026', 35);
 ```
 
 ### Configuración Hardcoded
@@ -1068,10 +1068,10 @@ Para instalar correctamente este plugin:
   - [ ] `listado-de-participantes`
   - [ ] `registro-edicion`
 - [ ] Insertar shortcodes en páginas:
-  - [ ] `[are_planesasuncion2025]` en página de planes
+  - [ ] `[are_planesasuncion2026]` en página de planes
   - [ ] `[arc_config_eventos]` en página de admin
 - [ ] Configurar metadatos en `evento_meta`:
-  - [ ] `url` = `/asuncion2025/`
+  - [ ] `url` = `/asuncion2026/`
   - [ ] `name_es` = Nombre del evento
   - [ ] `name_en` = Event name
 - [ ] Verificar tablas de BD existen:
@@ -1090,7 +1090,7 @@ Para instalar correctamente este plugin:
 
 ### Resumen Ejecutivo
 
-El plugin **ASIPI Registro Eventos Asunción 2025** es un sistema robusto y completo para gestionar registros de eventos. Tiene una arquitectura modular bien pensada y múltiples funcionalidades avanzadas.
+El plugin **ASIPI Registro Eventos Asunción 2026** es un sistema robusto y completo para gestionar registros de eventos. Tiene una arquitectura modular bien pensada y múltiples funcionalidades avanzadas.
 
 ### Calificación General
 
