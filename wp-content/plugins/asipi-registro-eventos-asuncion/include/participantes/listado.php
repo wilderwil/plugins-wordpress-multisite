@@ -286,7 +286,7 @@ div#contenedor-listado {
         foreach ($attendees as $att) {
           $boton_enviar='';
 			if($att->pwisa_users_ID != 6112)
-          		$boton_enviar = '<a class="btn btn-rounded font-weight-semibold text-3 p-relative bottom-1 custom-header-1-btn-1 " style="background-color:#255e70; color:#fff;" align="center" href="https://asipi.org/asuncion2025/contacto-a-participantes/?id='.$att->pwisa_users_ID.'">'.__("<!--:es-->Enviar Mensaje<!--:--><!--:en-->Send Message<!--:-->").'</a>';
+          		$boton_enviar = '<a class="btn btn-rounded font-weight-semibold text-3 p-relative bottom-1 custom-header-1-btn-1 " style="background-color:#255e70; color:#fff;" align="center" href="https://asipi.org/asuncion2026/contacto-a-participantes/?id='.$att->pwisa_users_ID.'">'.__("<!--:es-->Enviar Mensaje<!--:--><!--:en-->Send Message<!--:-->").'</a>';
             if($att->tipo_asistencia == 'Presencial'){
                 //name
                $objUser->name = ucwords(strtolower($att->name));

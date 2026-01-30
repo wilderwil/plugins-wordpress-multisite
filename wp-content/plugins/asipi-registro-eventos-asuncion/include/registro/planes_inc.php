@@ -40,7 +40,7 @@ foreach ($qryEvento as $key => $value) {
 
     <br>
 
-    <p><?php echo __('<!--:es--> Traslados no están incluido en el registro. Para contratar este servicio hacer <a href="/asuncion2025/traslados/" target="_blank">click aquí</a><!--:--><!--:en--> Transfers are not included in the registration. To hire this service  <a href="/asuncion2025/traslados/" target="_blank">click here</a><!--:-->') ?></p>
+    <p><?php echo __('<!--:es--> Traslados no están incluido en el registro. Para contratar este servicio hacer <a href="/asuncion2026/traslados/" target="_blank">click aquí</a><!--:--><!--:en--> Transfers are not included in the registration. To hire this service  <a href="/asuncion2026/traslados/" target="_blank">click here</a><!--:-->') ?></p>
 
     <br>
 

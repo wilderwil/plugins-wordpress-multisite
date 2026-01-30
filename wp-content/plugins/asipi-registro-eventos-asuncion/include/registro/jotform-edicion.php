@@ -1,7 +1,7 @@
 <?php if($_SERVER['SERVER_NAME']=='staging.asipi.org'){ ?>
 <!--src="<?php echo $url_form;?>" -->
 
-<iframe id="JotFormIFrame-252154118618152" title="Edicion Congreso Asunción 2025" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation"
+<iframe id="JotFormIFrame-252154118618152" title="Edicion Congreso Asunción 2026" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation"
     onload="window.parent.scrollTo(0,0)" allowtransparency="true" allowfullscreen="true"
     allow="geolocation; microphone; camera" src="<?php echo $url_form;?>" frameborder="0" style="
       min-width: 100%;
@@ -111,7 +111,7 @@ if (window.addEventListener) {
 <?php }else{ ?>
 
 
-<iframe id="JotFormIFrame-252023962027148" title="Edicion Congreso Asunción 2025" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation"
+<iframe id="JotFormIFrame-252023962027148" title="Edicion Congreso Asunción 2026" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation"
     onload="window.parent.scrollTo(0,0)" allowtransparency="true" allowfullscreen="true"
     allow="geolocation; microphone; camera" src="<?php echo $url_form;?>" frameborder="0" style="
       min-width: 100%;

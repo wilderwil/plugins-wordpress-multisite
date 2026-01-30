@@ -176,12 +176,12 @@ $user_id_2 = $wpdb->get_var( $wpdb->prepare(
 
 **Antes:**
 ```php
-$item3 = '<li ><a href="/asuncion2025/listado-de-participantes">...</a></li>';
+$item3 = '<li ><a href="/asuncion2026/listado-de-participantes">...</a></li>';
 ```
 
 **Después:**
 ```php
-$item3 = '<li><a href="' . esc_url('/asuncion2025/listado-de-participantes') . '">...</a></li>';
+$item3 = '<li><a href="' . esc_url('/asuncion2026/listado-de-participantes') . '">...</a></li>';
 ```
 
 **Beneficios:**

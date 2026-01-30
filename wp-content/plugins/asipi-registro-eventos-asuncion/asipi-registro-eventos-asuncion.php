@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name:       Asipi - Registro de Usuarios en Asunción 2025
+ * Plugin Name:       Asipi - Registro de Usuarios en Asunción 2026
  * Description:       Registro de usuarios a Asunción.
  * Version:           2.0.1
  * Author:            ZT Group Corp Team
@@ -144,9 +144,9 @@ function are_planescostos() {
     require_once plugin_dir_path(__FILE__) . 'include/registro/planes.php';
 }
 */
-add_shortcode('are_planesasuncion2025', 'are_planescostosasuncion2025'); 
-function are_planescostosasuncion2025() {
-    require_once plugin_dir_path(__FILE__) . 'include/registro/planesasuncion2025.php';
+add_shortcode('are_planesasuncion2026', 'are_planescostosasuncion2026'); 
+function are_planescostosasuncion2026() {
+    require_once plugin_dir_path(__FILE__) . 'include/registro/planesasuncion2026.php';
 }
 
 //Insertar Javascript js y enviar ruta admin-ajax.php
@@ -223,7 +223,7 @@ function add_extra_item_to_nav_menu( $items, $args ) {
         }
 
         if($user_id_2 > 0 || $admin){
-            $item3 = '<li><a href="' . esc_url('/asuncion2025/listado-de-participantes') . '">' . __("<!--:es-->Participantes<!--:--><!--:en-->List of Participants<!--:-->") . '</a></li>';
+            $item3 = '<li><a href="' . esc_url('/asuncion2026/listado-de-participantes') . '">' . __("<!--:es-->Participantes<!--:--><!--:en-->List of Participants<!--:-->") . '</a></li>';
         }
 
         // Usar prepared statement para registro principal
@@ -234,10 +234,10 @@ function add_extra_item_to_nav_menu( $items, $args ) {
         ));
         
         if($user_id_2 > 0){
-          # $item2 = '<li style="padding-top:13px;padding-left: 20px;padding-right: 20px;"><a href="/asuncion2025/registro-edicion">'.__("<!--:es-->Editar registro<!--:--><!--:en-->Register edit<!--:-->").'</a>';
-			  #$item2 = '<li><a href="/asuncion2025/registro-edicion">'.__("<!--:es-->Edición<!--:--><!--:en-->Edit<!--:-->").'</a>';
+          # $item2 = '<li style="padding-top:13px;padding-left: 20px;padding-right: 20px;"><a href="/asuncion2026/registro-edicion">'.__("<!--:es-->Editar registro<!--:--><!--:en-->Register edit<!--:-->").'</a>';
+			  #$item2 = '<li><a href="/asuncion2026/registro-edicion">'.__("<!--:es-->Edición<!--:--><!--:en-->Edit<!--:-->").'</a>';
     
-          #           $item4 = '<li style="padding-top:13px"><a href="/asuncion2025/registro-hotel">'.__("<!--:es-->Hotel<!--:--><!--:en-->Hotel<!--:-->").'</a>';
+          #           $item4 = '<li style="padding-top:13px"><a href="/asuncion2026/registro-hotel">'.__("<!--:es-->Hotel<!--:--><!--:en-->Hotel<!--:-->").'</a>';
         }
         
     }

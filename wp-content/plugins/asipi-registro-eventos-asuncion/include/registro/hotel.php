@@ -173,7 +173,7 @@ if(is_user_logged_in()){
 			<br><br>
             <span class="btnlogincont"><?php echo  __('[:es]Para reservar su habitación se debe registrar primero en el evento[:en]To book your room you must first register at the event[:]'); ?></span>
 			<br><br>
-            <a  class="btn btn_certificado" href="/asuncion2025/registro-evento/?t=presencial"><?php echo  __('[:es]Regístrate aquí[:en]Register Here[:]'); ?></a>
+            <a  class="btn btn_certificado" href="/asuncion2026/registro-evento/?t=presencial"><?php echo  __('[:es]Regístrate aquí[:en]Register Here[:]'); ?></a>
         </div>
 		<br><br><br>
     </div>
@@ -192,7 +192,7 @@ if(is_user_logged_in()){
 			<br><br>
             <span class="btnlogincont" id="loginlik"><?php echo  __('[:es]Iniciar Sesión[:en]Login[:]'); ?></span>
 			<br><br>
-            <a  class="btn btn_certificado" href="/asuncion2025/">Ir a Inicio</a>
+            <a  class="btn btn_certificado" href="/asuncion2026/">Ir a Inicio</a>
         </div>
 		<br><br><br>
     </div>
